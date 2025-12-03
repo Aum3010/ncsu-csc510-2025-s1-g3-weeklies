@@ -15,7 +15,7 @@ from flask import Flask, render_template, url_for, redirect, request, session, s
 
 # Use ONLY these helpers for DB access
 from proj2.sqlQueries import create_connection, close_connection, fetch_one, fetch_all, execute_query
-
+from collections import Counter, defaultdict
 from proj2.menu_generation import MenuGenerator
 
 app = Flask(__name__)
@@ -1120,68 +1120,205 @@ def generate_plan():
     finally:
         close_connection(conn)
 
-@app.route('/api/nutrition_stats')
-def nutrition_stats():
+@app.route('/insights')
+def insights():
     """
-    API Endpoint to fetch daily calorie totals for the generated menu.
-    Returns: JSON { "labels": ["Mon 10/27", ...], "data": [2400, 1800, ...] }
+    Render the new Data Intelligence Dashboard.
+    """
+    if session.get("Username") is None:
+        return redirect(url_for("login"))
+    return render_template("insights.html")
+
+@app.route('/api/insights_data')
+def insights_data():
+    """
+    Aggregates ALL user data for visualization.
+    Returns complex JSON with multiple datasets.
     """
     if session.get("Username") is None:
         return jsonify({"error": "Unauthorized"}), 401
 
     conn = create_connection(db_file)
     try:
-        # 1. Get the generated menu string from the DB
-        user = fetch_one(conn, 'SELECT generated_menu FROM "User" WHERE email = ?', (session.get("Email"),))
-        gen_str = user[0] if user else ""
-        
-        # 2. Parse it into a map: {'2025-10-27': [{'itm_id': 10}, ...]}
-        # (This uses the helper function 'parse_generated_menu' already in your Flask_app.py)
-        gen_map = parse_generated_menu(gen_str)
-        
-        if not gen_map:
-             return jsonify({"labels": [], "data": []})
+        # 1. Fetch User & Generated Menu
+        user_row = fetch_one(conn, 'SELECT usr_id, generated_menu FROM "User" WHERE email = ?', (session.get("Email"),))
+        if not user_row:
+            return jsonify({"error": "User not found"}), 404
+        usr_id, gen_menu_str = user_row
 
-        # 3. Collect all Item IDs to fetch their metadata (calories)
-        all_ids = set()
-        for entries in gen_map.values():
-            for e in entries:
-                all_ids.add(e['itm_id'])
+        # 2. Fetch All Orders
+        order_rows = fetch_all(conn, '''
+            SELECT o.ord_id, o.details, o.status, r.name
+            FROM "Order" o
+            JOIN "Restaurant" r ON o.rtr_id = r.rtr_id
+            WHERE o.usr_id = ?
+            ORDER BY o.ord_id ASC
+        ''', (usr_id,))
+
+        # --- DATA PROCESSING ---
         
-        # (This uses the helper 'fetch_menu_items_by_ids' already in your Flask_app.py)
-        items_meta = fetch_menu_items_by_ids(list(all_ids)) 
+        # A. Order History Parsing
+        orders_data = []
+        item_frequencies = Counter()
+        restaurant_spend = defaultdict(float)
+        restaurant_freq = Counter()
+        hourly_activity = defaultdict(int)
+        weekday_activity = defaultdict(int)
         
-        # 4. Aggregate Calories by Day
-        # Sort dates so the chart is chronological
-        sorted_dates = sorted(gen_map.keys())
-        labels = []
-        data = []
+        total_spend = 0.0
+        total_calories = 0
+        total_items = 0
         
-        for d in sorted_dates:
-            daily_cals = 0
-            for entry in gen_map[d]:
-                item = items_meta.get(entry['itm_id'])
-                if item:
-                    daily_cals += (item.get('calories') or 0)
-            
-            # Format the date nicely (e.g., "Mon 12/03")
+        spending_breakdown = {"food": 0.0, "tax": 0.0, "fees": 0.0, "tip": 0.0}
+        delivery_vs_pickup = {"delivery": 0, "pickup": 0}
+        
+        # For "Value Analysis" (Scatter plot)
+        value_scatter = [] # {x: calories, y: price, label: name}
+
+        for oid, details_json, status, r_name in order_rows:
+            if not details_json: continue
             try:
-                dt = datetime.fromisoformat(d)
-                labels.append(f"{dt.strftime('%a')} {dt.month}/{dt.day}")
-            except:
-                labels.append(d) # Fallback
-            
-            data.append(daily_cals)
-            
-        return jsonify({"labels": labels, "data": data})
+                d = json.loads(details_json)
+                
+                # timestamps
+                placed_at = d.get("placed_at") or d.get("time")
+                if placed_at:
+                    dt = datetime.fromisoformat(placed_at)
+                    hourly_activity[dt.hour] += 1
+                    weekday_activity[dt.strftime("%A")] += 1
+                
+                # financials
+                charges = d.get("charges", {})
+                subtotal = float(charges.get("subtotal", 0))
+                tax = float(charges.get("tax", 0))
+                fee = float(charges.get("delivery_fee", 0)) + float(charges.get("service_fee", 0))
+                tip = float(charges.get("tip", 0))
+                total = float(charges.get("total", 0))
+                
+                total_spend += total
+                spending_breakdown["food"] += subtotal
+                spending_breakdown["tax"] += tax
+                spending_breakdown["fees"] += fee
+                spending_breakdown["tip"] += tip
+                
+                restaurant_spend[r_name] += total
+                restaurant_freq[r_name] += 1
+                
+                dtype = d.get("delivery_type", "delivery")
+                delivery_vs_pickup[dtype] += 1
+
+                # Items (we need to fetch calorie data if not in JSON, but let's assume JSON has it or we skip)
+                # Actually, Order details JSON usually stores name/price. Calories might be missing.
+                # We will just count frequencies here.
+                for item in d.get("items", []):
+                    item_frequencies[item.get("name")] += item.get("qty", 1)
+                    
+                    # For scatter plot, we try to estimate unit price
+                    u_price = float(item.get("unit_price", 0))
+                    # Note: We assume calories aren't always in order JSON. 
+                    # If you want calories, we'd need to query MenuItem table.
+                    # Let's do a bulk query for Item Metadata later.
+
+            except Exception as e:
+                continue
+
+        # B. Planned vs Actual (Generated Menu)
+        gen_map = parse_generated_menu(gen_menu_str)
+        # We need to fetch metadata for all items in Generated Plan AND Orders to do calorie math
+        
+        # 3. Fetch Metadata for Deep Analysis
+        # Get all item IDs from generated menu
+        gen_item_ids = set()
+        for day_list in gen_map.values():
+            for e in day_list:
+                gen_item_ids.add(e['itm_id'])
+        
+        # We also want to find "Healthy Alternatives". 
+        # Let's fetch ALL menu items for the restaurants the user visited.
+        visited_rtr_ids = fetch_all(conn, 'SELECT DISTINCT rtr_id FROM "Order" WHERE usr_id = ?', (usr_id,))
+        visited_ids = [r[0] for r in visited_rtr_ids]
+        
+        alternatives_data = {} # rtr_id -> [items sorted by calories]
+        if visited_ids:
+            q = ",".join(["?"]*len(visited_ids))
+            all_rtr_items = fetch_all(conn, f'SELECT rtr_id, name, price, calories FROM MenuItem WHERE rtr_id IN ({q})', tuple(visited_ids))
+            for rid, name, price, cal in all_rtr_items:
+                if rid not in alternatives_data: alternatives_data[rid] = []
+                alternatives_data[rid].append({"name": name, "price": price, "calories": cal})
+        
+        # 4. Construct Datasets
+        
+        # Chart 1: Top 5 Restaurants (Freq)
+        top_rest = restaurant_freq.most_common(5)
+        
+        # Chart 2: Meal Time Distribution (Pie)
+        # Using hour buckets: Breakfast (5-11), Lunch (11-15), Dinner (15-23), Late Night (23-5)
+        meal_times = {"Breakfast": 0, "Lunch": 0, "Dinner": 0, "Late Night": 0}
+        for h, count in hourly_activity.items():
+            if 5 <= h < 11: meal_times["Breakfast"] += count
+            elif 11 <= h < 16: meal_times["Lunch"] += count
+            elif 16 <= h < 23: meal_times["Dinner"] += count
+            else: meal_times["Late Night"] += count
+
+        # Chart 3: Spending Breakdown (Food vs Fees)
+        
+        # Insight Generation
+        insights_text = []
+        if spending_breakdown["tip"] > (spending_breakdown["food"] * 0.25):
+            insights_text.append("Generous Tipper! You average over 25% in tips.")
+        
+        if delivery_vs_pickup["delivery"] > delivery_vs_pickup["pickup"] * 2:
+            insights_text.append("Delivery Heavy: You could save ~15% by switching to pickup more often.")
+
+        fav_rest = top_rest[0][0] if top_rest else "None"
+        insights_text.append(f"Loyalist: Your favorite spot is {fav_rest}.")
+
+        return jsonify({
+            "charts": {
+                "top_restaurants": {
+                    "labels": [r[0] for r in top_rest],
+                    "data": [r[1] for r in top_rest]
+                },
+                "meal_times": {
+                    "labels": list(meal_times.keys()),
+                    "data": list(meal_times.values())
+                },
+                "spending_breakdown": {
+                    "labels": ["Food Cost", "Tax", "Service/Delivery Fees", "Tips"],
+                    "data": [
+                        spending_breakdown["food"], 
+                        spending_breakdown["tax"], 
+                        spending_breakdown["fees"], 
+                        spending_breakdown["tip"]
+                    ]
+                },
+                "activity_by_day": {
+                    "labels": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+                    "data": [weekday_activity.get(d, 0) for d in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]]
+                },
+                "delivery_mode": {
+                    "labels": ["Delivery", "Pickup"],
+                    "data": [delivery_vs_pickup["delivery"], delivery_vs_pickup["pickup"]]
+                },
+                "top_items": {
+                    "labels": [i[0] for i in item_frequencies.most_common(5)],
+                    "data": [i[1] for i in item_frequencies.most_common(5)]
+                }
+            },
+            "insights": insights_text,
+            "stats": {
+                "total_orders": len(order_rows),
+                "total_spend": total_spend,
+                "avg_order": (total_spend / len(order_rows)) if order_rows else 0
+            }
+        })
 
     except Exception as e:
-        print(f"Stats Error: {e}")
-        return jsonify({"labels": [], "data": []})
-        
+        print(f"Insights Error: {e}")
+        return jsonify({"error": str(e)}), 500
     finally:
         close_connection(conn)
-              
+
 if __name__ == '__main__':
     """
     DB column names:
