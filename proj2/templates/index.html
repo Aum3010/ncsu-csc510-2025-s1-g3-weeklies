@@ -450,33 +450,60 @@ document.getElementById('btnGenerate').addEventListener('click', async function(
 });
 
 (function () {
-  // Format hours to readable format - defined early
+// Format hours to readable format - 
   function formatHours(hoursStr) {
-    if (!hoursStr || !hoursStr.trim()) return '';
-    let hours = hoursStr.trim();
-    hours = hours
-      .replace(/monday/gi, 'M')
-      .replace(/tuesday/gi, 'T')
-      .replace(/wednesday/gi, 'W')
-      .replace(/thursday/gi, 'Th')
-      .replace(/friday/gi, 'F')
-      .replace(/saturday/gi, 'Sa')
-      .replace(/sunday/gi, 'Su')
-      .replace(/mon(?!\w)/gi, 'M')
-      .replace(/tue(?!\w)/gi, 'T')
-      .replace(/wed(?!\w)/gi, 'W')
-      .replace(/thu(?!\w)/gi, 'Th')
-      .replace(/fri(?!\w)/gi, 'F')
-      .replace(/sat(?!\w)/gi, 'Sa')
-      .replace(/sun(?!\w)/gi, 'Su');
-    hours = hours.replace(/([MTWThFSaSu])\s*-\s*([MTWThFSaSu])/g, '$1$2');
-    hours = hours.replace(/\s*-\s*/g, ' to ');
-    hours = hours.replace(/(\d+)\s*(AM|PM)/gi, (match, num, period) => num + ' ' + period.toLowerCase());
-    hours = hours.replace(/\s+/g, ' ').trim();
-    if (hours.match(/[MTWThFSaSu]/) && hours.match(/\d/)) return hours;
-    return hoursStr.replace(/\s+/g, ' ').trim();
-  }
+    if (!hoursStr) return '';
 
+    // 1. Try to parse as JSON first
+    try {
+      const hoursObj = JSON.parse(hoursStr);
+      
+      const dayMap = { "M": "Mon", "T": "Tue", "W": "Wed", "Th": "Thu", "F": "Fri", "Sa": "Sat", "Su": "Sun" };
+      const dayOrder = ["M", "T", "W", "Th", "F", "Sa", "Su"];
+      
+      const fmtTime = (val) => {
+        let h = Math.floor(val / 100);
+        let m = val % 100;
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        if (h > 12) h -= 12;
+        if (h === 0) h = 12;
+        return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+      };
+
+      let lines = [];
+      dayOrder.forEach(key => {
+        const times = hoursObj[key];
+        if (Array.isArray(times) && times.length >= 2) {
+          let timeRanges = [];
+          for(let i = 0; i < times.length; i += 2) {
+            if (times[i+1] !== undefined) {
+              timeRanges.push(`${fmtTime(times[i])}–${fmtTime(times[i+1])}`);
+            }
+          }
+          if (timeRanges.length > 0) {
+            lines.push(`${dayMap[key] || key}: ${timeRanges.join(', ')}`);
+          }
+        }
+      });
+      
+      return lines.join(' · ');
+
+    } catch (e) {
+      // 2. Legacy Fallback (Regex for old text format)
+      let hours = hoursStr.trim();
+      hours = hours
+        .replace(/monday/gi, 'M').replace(/tuesday/gi, 'T').replace(/wednesday/gi, 'W')
+        .replace(/thursday/gi, 'Th').replace(/friday/gi, 'F').replace(/saturday/gi, 'Sa')
+        .replace(/sunday/gi, 'Su')
+        .replace(/mon(?!\w)/gi, 'M').replace(/tue(?!\w)/gi, 'T').replace(/wed(?!\w)/gi, 'W')
+        .replace(/thu(?!\w)/gi, 'Th').replace(/fri(?!\w)/gi, 'F').replace(/sat(?!\w)/gi, 'Sa')
+        .replace(/sun(?!\w)/gi, 'Su');
+      hours = hours.replace(/([MTWThFSaSu])\s*-\s*([MTWThFSaSu])/g, '$1$2');
+      hours = hours.replace(/\s*-\s*/g, ' to ').replace(/\s*:\s*/g, ':');
+      hours = hours.replace(/(\d+)\s*(AM|PM)/gi, (match, num, period) => num + ' ' + period.toLowerCase());
+      return hours.replace(/\s+/g, ' ').trim();
+    }
+  }
   // ======== Calendar Popover (existing) ========
   const popover = document.createElement('div');
   popover.className = 'menu-popover';

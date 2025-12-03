@@ -168,26 +168,7 @@
             </div>
           </div>
         </div>
-        <div class="page-title" style="margin-top: 32px">
-          <h1>Health Insights</h1>
-          <p class="hide-sm">Projected nutrition based on your AI Plan</p>
-        </div>
-
-        <div class="card max-w-lg" style="max-width: var(--container)">
-          <div class="card-body">
-            <div style="position: relative; height: 300px; width: 100%">
-              <canvas id="nutritionChart"></canvas>
-            </div>
-            <p
-              id="chartFallback"
-              class="muted"
-              style="text-align: center; display: none; margin-top: 20px"
-            >
-              No meal plan generated yet. Go to the Home page to auto-plan your
-              week!
-            </p>
-          </div>
-        </div>
+        
         <!-- Order Tracking -->
         <div class="page-title" style="margin-top: 20px">
           <h1>Order Tracking</h1>
@@ -504,72 +485,7 @@
         color: #dc3545;
       }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-      document.addEventListener("DOMContentLoaded", async () => {
-        const ctxEl = document.getElementById("nutritionChart");
-        if (!ctxEl) return; // Guard clause
-
-        try {
-          // 1. Fetch data from our new API
-          const res = await fetch("{{ url_for('nutrition_stats') }}");
-          const json = await res.json();
-
-          // 2. Handle empty state
-          if (!json.labels || json.labels.length === 0) {
-            document.getElementById("chartFallback").style.display = "block";
-            ctxEl.style.display = "none";
-            return;
-          }
-
-          // 3. Render Chart
-          new Chart(ctxEl.getContext("2d"), {
-            type: "bar",
-            data: {
-              labels: json.labels,
-              datasets: [
-                {
-                  label: "Daily Calories",
-                  data: json.data,
-                  backgroundColor: "rgba(91, 140, 255, 0.2)", // Matches your theme var(--primary)
-                  borderColor: "rgba(91, 140, 255, 1)",
-                  borderWidth: 1,
-                  borderRadius: 6,
-                  barThickness: "flex",
-                  maxBarThickness: 50,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  grid: { color: "rgba(255, 255, 255, 0.1)" }, // Subtle grid for dark mode
-                  ticks: { color: "#a9afc1" },
-                },
-                x: {
-                  grid: { display: false },
-                  ticks: { color: "#a9afc1" },
-                },
-              },
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  callbacks: {
-                    label: function (context) {
-                      return context.raw + " kcal";
-                    },
-                  },
-                },
-              },
-            },
-          });
-        } catch (err) {
-          console.error("Failed to load nutrition chart:", err);
-        }
-      });
       // Render read-only bubbles from CSV in data-prefs, matching register page styling
       (function renderPrefBubbles() {
         const root = document.getElementById("prefBubbles");

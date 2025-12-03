@@ -130,6 +130,43 @@ def fetch_menu_items_by_ids(ids):
                 parts.append(sp)
         return ", ".join(parts)
 
+    def _fmt_hours(h_str) -> str:
+        """Parses the JSON hours string into a readable format server-side."""
+        if not h_str: return ""
+        try:
+            # Load JSON
+            h_obj = json.loads(h_str)
+            day_map = {"M": "Mon", "T": "Tue", "W": "Wed", "Th": "Thu", "F": "Fri", "Sa": "Sat", "Su": "Sun"}
+            order = ["M", "T", "W", "Th", "F", "Sa", "Su"]
+            
+            lines = []
+            for k in order:
+                times = h_obj.get(k)
+                if times and len(times) >= 2:
+                    # Convert 1700 -> 5:00 PM
+                    ranges = []
+                    for i in range(0, len(times), 2):
+                        if i+1 < len(times):
+                            start, end = times[i], times[i+1]
+                            
+                            def to_time(v):
+                                h = v // 100
+                                m = v % 100
+                                ampm = "AM"
+                                if h >= 12: ampm = "PM"
+                                if h > 12: h -= 12
+                                if h == 0: h = 12
+                                return f"{h}:{m:02d} {ampm}"
+                            
+                            ranges.append(f"{to_time(start)}–{to_time(end)}")
+                    
+                    if ranges:
+                        lines.append(f"{day_map.get(k, k)}: {', '.join(ranges)}")
+            return " · ".join(lines)
+        except Exception:
+            # Fallback if not JSON
+            return str(h_str)
+
     out = {}
     for r in rows:
         out[r[0]] = {
@@ -142,7 +179,7 @@ def fetch_menu_items_by_ids(ids):
             "allergens": r[6],
             "restaurant_name": r[7],
             "restaurant_address": _addr(r[8], r[9], r[10], r[11]),
-            "restaurant_hours": r[12] or "",
+            "restaurant_hours": _fmt_hours(r[12]), # <--- NOW FORMATTED IN PYTHON
             "restaurant_phone": r[13] or "",
         }
     return out
