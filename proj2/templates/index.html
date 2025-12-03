@@ -425,7 +425,7 @@ document.getElementById('btnGenerate').addEventListener('click', async function(
     const btn = this;
     const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = "✨ AI is thinking...";
+    btn.innerHTML = " AI is thinking...";
 
     try {
         const res = await fetch("{{ url_for('generate_plan') }}", {
