@@ -1119,7 +1119,69 @@ def generate_plan():
         return jsonify({"ok": False, "error": str(e)}), 500
     finally:
         close_connection(conn)
+
+@app.route('/api/nutrition_stats')
+def nutrition_stats():
+    """
+    API Endpoint to fetch daily calorie totals for the generated menu.
+    Returns: JSON { "labels": ["Mon 10/27", ...], "data": [2400, 1800, ...] }
+    """
+    if session.get("Username") is None:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = create_connection(db_file)
+    try:
+        # 1. Get the generated menu string from the DB
+        user = fetch_one(conn, 'SELECT generated_menu FROM "User" WHERE email = ?', (session.get("Email"),))
+        gen_str = user[0] if user else ""
         
+        # 2. Parse it into a map: {'2025-10-27': [{'itm_id': 10}, ...]}
+        # (This uses the helper function 'parse_generated_menu' already in your Flask_app.py)
+        gen_map = parse_generated_menu(gen_str)
+        
+        if not gen_map:
+             return jsonify({"labels": [], "data": []})
+
+        # 3. Collect all Item IDs to fetch their metadata (calories)
+        all_ids = set()
+        for entries in gen_map.values():
+            for e in entries:
+                all_ids.add(e['itm_id'])
+        
+        # (This uses the helper 'fetch_menu_items_by_ids' already in your Flask_app.py)
+        items_meta = fetch_menu_items_by_ids(list(all_ids)) 
+        
+        # 4. Aggregate Calories by Day
+        # Sort dates so the chart is chronological
+        sorted_dates = sorted(gen_map.keys())
+        labels = []
+        data = []
+        
+        for d in sorted_dates:
+            daily_cals = 0
+            for entry in gen_map[d]:
+                item = items_meta.get(entry['itm_id'])
+                if item:
+                    daily_cals += (item.get('calories') or 0)
+            
+            # Format the date nicely (e.g., "Mon 12/03")
+            try:
+                dt = datetime.fromisoformat(d)
+                labels.append(f"{dt.strftime('%a')} {dt.month}/{dt.day}")
+            except:
+                labels.append(d) # Fallback
+            
+            data.append(daily_cals)
+            
+        return jsonify({"labels": labels, "data": data})
+
+    except Exception as e:
+        print(f"Stats Error: {e}")
+        return jsonify({"labels": [], "data": []})
+        
+    finally:
+        close_connection(conn)
+              
 if __name__ == '__main__':
     """
     DB column names:
