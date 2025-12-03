@@ -16,7 +16,7 @@
       <a href="{{ url_for('profile') }}">Profile</a>
       <a href="{{ url_for('restaurants') }}">Restaurants</a>
       <a href="{{ url_for('orders') }}">Order</a>
-      <a href="{{ url_for('db_view') }}">DB</a>
+      <!-- <a href="{{ url_for('db_view') }}">DB</a> -->
       <a href="{{ url_for('logout') }}" data-confirm="Log out now?">Logout</a>
     </nav>
   </div>
@@ -56,6 +56,9 @@
     <div class="page-title" style="align-items:center; justify-content:space-between;">
       <h1 class="mb-0">Menu Calendar</h1>
       <div class="greet" style="color: var(--muted); font-weight:600;">Welcome, {{ username }}.</div>
+      <button id="btnGenerate" class="btn btn-primary" style="background: linear-gradient(135deg, #667eea, #764ba2); border:none;">
+          ✨ Auto-Plan Week
+      </button>
     </div>
 
     {% set meal_names = {1: 'Breakfast', 2: 'Lunch', 3: 'Dinner'} %}
@@ -416,6 +419,35 @@
 </style>
 
 <script>
+document.getElementById('btnGenerate').addEventListener('click', async function() {
+    if(!confirm("Generate a 7-day meal plan based on your profile preferences?")) return;
+
+    const btn = this;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = "✨ AI is thinking...";
+
+    try {
+        const res = await fetch("{{ url_for('generate_plan') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"}
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+            window.location.reload(); // Refresh to show the new meals
+        } else {
+            alert("Error: " + (data.error || "Could not generate plan"));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Network error.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
 (function () {
   // Format hours to readable format - defined early
   function formatHours(hoursStr) {

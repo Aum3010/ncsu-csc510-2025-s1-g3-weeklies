@@ -10,8 +10,8 @@
 ### 🪟 Windows (PowerShell)
 ```powershell
 # 1️⃣ Clone the repository
-git clone https://github.com/TaylorBrown96/SE25Fall.git
-cd SE25Fall
+git clone https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.git
+cd ncsu-csc510-2025-s1-g3-weeklies
 
 # 2️⃣ Create and activate a virtual environment
 py -3 -m venv .venv
@@ -27,8 +27,8 @@ pip install -r proj2/requirements.txt
 ### 🐧MacOS / Linux (Bash/Zsh)
 ```bash
 # 1️⃣ Clone the repository
-git clone https://github.com/TaylorBrown96/SE25Fall.git
-cd SE25Fall
+git clone https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.git
+cd ncsu-csc510-2025-s1-g3-weeklies
 
 # 2️⃣ Create & activate a venv
 python3 -m venv .venv

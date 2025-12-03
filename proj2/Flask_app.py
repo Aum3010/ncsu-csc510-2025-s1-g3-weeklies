@@ -16,6 +16,8 @@ from flask import Flask, render_template, url_for, redirect, request, session, s
 # Use ONLY these helpers for DB access
 from proj2.sqlQueries import create_connection, close_connection, fetch_one, fetch_all, execute_query
 
+from proj2.menu_generation import MenuGenerator
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 
@@ -1073,6 +1075,51 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--port', type=int, default=5000, help='Port to run the Flask app on')
     return parser.parse_args()
 
+@app.route('/generate_plan', methods=['POST'])
+def generate_plan():
+    if session.get("Username") is None:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    # 1. Fetch User Metadata (Preferences & Allergies)
+    conn = create_connection(db_file)
+    try:
+        user = fetch_one(conn, 'SELECT preferences, allergies, generated_menu FROM "User" WHERE email = ?', (session.get("Email"),))
+        if not user:
+            return jsonify({"ok": False, "error": "User not found"}), 404
+        
+        prefs, allergies, current_menu = user[0] or "", user[1] or "", user[2] or ""
+
+        # 2. Initialize Generator
+        # Using 500 tokens as defined in your system
+        gen = MenuGenerator(tokens=500)
+        
+        # 3. Define Timeframe (Next 7 days starting tomorrow)
+        start_date = (date.today() + timedelta(days=1)).isoformat()
+        
+        # 4. Generate Menu
+        # We pass the stored 'prefs' directly. The MenuGenerator will filter items 
+        # and prompt the LLM based on these existing tags.
+        new_menu_str = gen.update_menu(
+            menu=current_menu, 
+            preferences=prefs, 
+            allergens=allergies, 
+            date=start_date, 
+            meal_numbers=[1, 2, 3], # Breakfast, Lunch, Dinner
+            number_of_days=7
+        )
+
+        # 5. Save & Update Session
+        execute_query(conn, 'UPDATE "User" SET generated_menu = ? WHERE email = ?', (new_menu_str, session.get("Email")))
+        session["GeneratedMenu"] = new_menu_str
+        
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        print(f"Generation Error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        close_connection(conn)
+        
 if __name__ == '__main__':
     """
     DB column names:
