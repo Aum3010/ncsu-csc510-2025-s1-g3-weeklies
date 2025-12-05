@@ -50,6 +50,40 @@ def _cents_to_dollars(cents) -> float:
         return _money((cents or 0) / 100.0)
     except Exception:
         return 0.0
+    
+def _dollars_to_cents(dollars) -> int:
+    """
+    Convert an amount in dollars to cents.
+    Args:
+        dollars (int | float | None): The value in dollars to convert.
+    Returns:
+        int: The cent value (0 on failure).
+    """
+    try:
+        # Use _money to ensure 2 decimal places, then multiply by 100
+        return int(_money(dollars) * 100)
+    except Exception:
+        return 0
+
+def _execute_transaction(conn, queries_and_params: list) -> bool:
+    """
+    Execute multiple queries in a single, atomic transaction.
+    Args:
+        conn (sqlite3.Connection): Active database connection.
+        queries_and_params (list): List of (query: str, params: tuple) pairs.
+    Returns:
+        bool: True on success, False on failure (with automatic rollback).
+    """
+    try:
+        cur = conn.cursor()
+        for query, params in queries_and_params:
+            cur.execute(query, params)
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Transaction failed, rolling back: {e}")
+        conn.rollback()
+        return False
 
 def parse_generated_menu(gen_str):
     """
@@ -653,6 +687,98 @@ def change_password():
 
     # Success
     return redirect(url_for('profile', pw_updated=1))
+
+# Wallet Management Routes
+@app.route('/profile/wallet/topup', methods=['POST'])
+def wallet_topup():
+    """
+    Simulate adding funds to the user's wallet.
+    """
+    if session.get('usr_id') is None:
+        return redirect(url_for('login'))
+
+    try:
+        amount_dollars = _money(request.form.get('amount') or 0)
+        amount_cents = _dollars_to_cents(amount_dollars)
+    except Exception:
+        return redirect(url_for('profile', wallet_error='invalid_amount'))
+
+    if amount_cents <= 0:
+        return redirect(url_for('profile', wallet_error='zero_amount'))
+
+    usr_id = session['usr_id']
+    
+    conn = create_connection(db_file)
+    try:
+        # Atomically update the user's wallet balance
+        success = _execute_transaction(conn, [
+            ('UPDATE "User" SET wallet = wallet + ? WHERE usr_id = ?', (amount_cents, usr_id))
+        ])
+
+        if success:
+            # Refresh session and redirect
+            session['Wallet'] = session['Wallet'] + amount_cents
+            return redirect(url_for('profile', wallet_updated='topup'))
+        else:
+            return redirect(url_for('profile', wallet_error='db_failed'))
+    finally:
+        close_connection(conn)
+
+
+@app.route('/profile/wallet/gift', methods=['POST'])
+def wallet_gift():
+    """
+    Transfer funds from the logged-in user to another user by email.
+    """
+    if session.get('usr_id') is None:
+        return redirect(url_for('login'))
+
+    recipient_email = (request.form.get('recipient_email') or '').strip().lower()
+    try:
+        amount_dollars = _money(request.form.get('amount') or 0)
+        amount_cents = _dollars_to_cents(amount_dollars)
+    except Exception:
+        return redirect(url_for('profile', wallet_error='invalid_amount'))
+
+    sender_id = session['usr_id']
+
+    if amount_cents <= 0:
+        return redirect(url_for('profile', wallet_error='zero_amount'))
+    if recipient_email == session.get('Email'):
+        return redirect(url_for('profile', wallet_error='self_gift'))
+
+    conn = create_connection(db_file)
+    try:
+        # 1. Get sender's current balance and recipient's ID
+        sender = fetch_one(conn, 'SELECT wallet FROM "User" WHERE usr_id = ?', (sender_id,))
+        recipient = fetch_one(conn, 'SELECT usr_id FROM "User" WHERE email = ?', (recipient_email,))
+
+        if not sender or not recipient:
+            return redirect(url_for('profile', wallet_error='recipient_not_found'))
+
+        sender_balance = sender[0] or 0
+        recipient_id = recipient[0]
+
+        if sender_balance < amount_cents:
+            return redirect(url_for('profile', wallet_error='insufficient_funds'))
+
+        # 2. Prepare the atomic transaction (two steps: debit and credit)
+        queries_and_params = [
+            # Debit sender
+            ('UPDATE "User" SET wallet = wallet - ? WHERE usr_id = ?', (amount_cents, sender_id)),
+            # Credit recipient
+            ('UPDATE "User" SET wallet = wallet + ? WHERE usr_id = ?', (amount_cents, recipient_id))
+        ]
+
+        # 3. Execute the atomic transaction
+        if _execute_transaction(conn, queries_and_params):
+            # Refresh sender's session wallet value
+            session['Wallet'] = session['Wallet'] - amount_cents
+            return redirect(url_for('profile', wallet_updated='gift'))
+        else:
+            return redirect(url_for('profile', wallet_error='db_failed'))
+    finally:
+        close_connection(conn)
 
 # Order route (Calendar "Order" button target)
 @app.route('/order', methods=['GET', 'POST'])

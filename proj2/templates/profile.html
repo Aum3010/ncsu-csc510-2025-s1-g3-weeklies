@@ -61,6 +61,26 @@
         </div>
         {% endif %} {% endif %}
 
+        {% if wallet_updated == 'topup' %}
+          <div class="flash success">Wallet topped up successfully.</div>
+        {% elif wallet_updated == 'gift' %}
+          <div class="flash success">Funds gifted successfully.</div>
+        {% elif wallet_error %}
+          {% if wallet_error == 'invalid_amount' %}
+            <div class="flash danger">Invalid amount specified.</div>
+          {% elif wallet_error == 'zero_amount' %}
+            <div class="flash danger">Amount must be greater than zero.</div>
+          {% elif wallet_error == 'insufficient_funds' %}
+            <div class="flash danger">Insufficient funds in your wallet.</div>
+          {% elif wallet_error == 'recipient_not_found' %}
+            <div class="flash danger">Recipient email not found.</div>
+          {% elif wallet_error == 'self_gift' %}
+            <div class="flash danger">Cannot gift funds to yourself.</div>
+          {% else %}
+            <div class="flash danger">Wallet operation failed. Please try again.</div>
+          {% endif %}
+        {% endif %}
+
         <div class="card max-w-lg" style="max-width: var(--container)">
           <!-- NEW: header row with title + Edit button -->
           <div
@@ -89,6 +109,22 @@
               >
                 Change Password
               </button>
+
+              <button 
+                type="button" 
+                class="btn btn-success btn-sm" 
+                id="openTopupBtn"
+              >
+                Top Up
+              </button>
+              <button 
+                type="button" 
+                class="btn btn-warning btn-sm" 
+                id="openGiftBtn"
+              >
+                Gift
+              </button>
+            </div>
             </div>
           </div>
 
@@ -309,6 +345,46 @@
             >
               Update Password
             </button>
+          </div>
+        </form>
+      </div>
+      <!-- Add Wallet Top Up Modal -->
+      <div id="topupModalBackdrop" class="modal-backdrop" aria-hidden="true"></div>
+      <div id="topupModal" class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="topupModalTitle" aria-hidden="true">
+        <div class="modal-head">
+          <h3 id="topupModalTitle" style="margin:0; font-size:18px;">Add Funds to Wallet</h3>
+          <button type="button" class="btn btn-outline btn-sm" id="closeTopupModalBtn" aria-label="Close">Close</button>
+        </div>
+        <form id="topupForm" class="modal-body" method="POST" action="{{ url_for('wallet_topup') }}">
+          <div class="form-row">
+            <label for="topupAmount">Amount ($)</label>
+            <input class="input" id="topupAmount" name="amount" type="number" step="0.01" min="1" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancelTopupBtn">Cancel</button>
+            <button type="submit" class="btn btn-success">Top Up</button>
+          </div>
+        </form>
+      </div>
+      <!-- Add Wallet Gift Modal -->
+      <div id="giftModalBackdrop" class="modal-backdrop" aria-hidden="true"></div>
+      <div id="giftModal" class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="giftModalTitle" aria-hidden="true">
+        <div class="modal-head">
+          <h3 id="giftModalTitle" style="margin:0; font-size:18px;">Gift Funds</h3>
+          <button type="button" class="btn btn-outline btn-sm" id="closeGiftModalBtn" aria-label="Close">Close</button>
+        </div>
+        <form id="giftForm" class="modal-body" method="POST" action="{{ url_for('wallet_gift') }}">
+          <div class="form-row">
+            <label for="giftEmail">Recipient Email</label>
+            <input class="input" id="giftEmail" name="recipient_email" type="email" required>
+          </div>
+          <div class="form-row" style="margin-top:10px;">
+            <label for="giftAmount">Amount ($)</label>
+            <input class="input" id="giftAmount" name="amount" type="number" step="0.01" min="1" required>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancelGiftBtn">Cancel</button>
+            <button type="submit" class="btn btn-warning">Send Gift</button>
           </div>
         </form>
       </div>
@@ -669,6 +745,67 @@
         // initial
         update();
       });
+      
+      // For Wallet actions
+      // Top Up and Gifting
+      document.addEventListener('DOMContentLoaded', function() {
+      // Top Up Modal Logic
+      const openTopupBtn = document.getElementById('openTopupBtn');
+      const closeTopupBtn = document.getElementById('closeTopupModalBtn');
+      const cancelTopupBtn = document.getElementById('cancelTopupBtn');
+      const topupModal = document.getElementById('topupModal');
+      const topupBackdrop = document.getElementById('topupModalBackdrop');
+      const topupForm = document.getElementById('topupForm');
+
+      function showTopupModal() {
+        topupModal.classList.add('show');
+        topupBackdrop.classList.add('show');
+        setTimeout(() => document.getElementById('topupAmount').focus(), 0);
+      }
+      function hideTopupModal() {
+        topupModal.classList.remove('show');
+        topupBackdrop.classList.remove('show');
+        topupForm.reset();
+      }
+
+      openTopupBtn && openTopupBtn.addEventListener('click', showTopupModal);
+      closeTopupBtn && closeTopupBtn.addEventListener('click', hideTopupModal);
+      cancelTopupBtn && cancelTopupBtn.addEventListener('click', hideTopupModal);
+      topupBackdrop && topupBackdrop.addEventListener('click', hideTopupModal);
+
+      // Gift Modal Logic
+      const openGiftBtn = document.getElementById('openGiftBtn');
+      const closeGiftBtn = document.getElementById('closeGiftModalBtn');
+      const cancelGiftBtn = document.getElementById('cancelGiftBtn');
+      const giftModal = document.getElementById('giftModal');
+      const giftBackdrop = document.getElementById('giftModalBackdrop');
+      const giftForm = document.getElementById('giftForm');
+
+      function showGiftModal() {
+        giftModal.classList.add('show');
+        giftBackdrop.classList.add('show');
+        setTimeout(() => document.getElementById('giftEmail').focus(), 0);
+      }
+      function hideGiftModal() {
+        giftModal.classList.remove('show');
+        giftBackdrop.classList.remove('show');
+        giftForm.reset();
+      }
+
+      openGiftBtn && openGiftBtn.addEventListener('click', showGiftModal);
+      closeGiftBtn && closeGiftBtn.addEventListener('click', hideGiftModal);
+      cancelGiftBtn && cancelGiftBtn.addEventListener('click', hideGiftModal);
+      giftBackdrop && giftBackdrop.addEventListener('click', hideGiftModal);
+
+      // Add escape key handler for all modas
+      document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            hideTopupModal();
+            hideGiftModal();
+          }
+        });
+      });
+
     </script>
   </body>
 </html>
