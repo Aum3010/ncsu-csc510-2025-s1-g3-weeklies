@@ -5,6 +5,7 @@ import argparse
 import math
 import json
 import calendar
+from enum import Enum
 from io import BytesIO
 from flask import jsonify
 from sqlite3 import IntegrityError
@@ -18,6 +19,18 @@ from flask import Flask, render_template, url_for, redirect, request, session, s
 from sqlQueries import create_connection, close_connection, fetch_one, fetch_all, execute_query
 from collections import Counter, defaultdict
 from menu_generation import MenuGenerator
+
+# ----------MANAGE ORDER STATUS--------------
+class OrderStatus(Enum):
+    ORDERED =  'Ordered'
+    PREPARING = 'Preparing'
+    DELIVERED = 'Delivered'
+
+    def get_lowercase(self):
+        return self.value.lower()
+    
+    def get_uppercase(self):
+        return self.value.upper()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
@@ -51,6 +64,40 @@ def _cents_to_dollars(cents) -> float:
         return _money((cents or 0) / 100.0)
     except Exception:
         return 0.0
+    
+def _dollars_to_cents(dollars) -> int:
+    """
+    Convert an amount in dollars to cents.
+    Args:
+        dollars (int | float | None): The value in dollars to convert.
+    Returns:
+        int: The cent value (0 on failure).
+    """
+    try:
+        # Use _money to ensure 2 decimal places, then multiply by 100
+        return int(_money(dollars) * 100)
+    except Exception:
+        return 0
+
+def _execute_transaction(conn, queries_and_params: list) -> bool:
+    """
+    Execute multiple queries in a single, atomic transaction.
+    Args:
+        conn (sqlite3.Connection): Active database connection.
+        queries_and_params (list): List of (query: str, params: tuple) pairs.
+    Returns:
+        bool: True on success, False on failure (with automatic rollback).
+    """
+    try:
+        cur = conn.cursor()
+        for query, params in queries_and_params:
+            cur.execute(query, params)
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Transaction failed, rolling back: {e}")
+        conn.rollback()
+        return False
 
 def parse_generated_menu(gen_str):
     """
@@ -229,6 +276,12 @@ def build_calendar_cells(gen_map, year, month, items_by_id):
 
     return cells
 
+
+def _is_restaurant_reviewed(conn, usr_id: int, rtr_id: int) -> bool:
+    """Check if the user has already submitted a review for this specific restaurant."""
+    # Checks the existing schema: Review(rev_id, rtr_id, usr_id, title, rating, description)
+    sql = 'SELECT 1 FROM "Review" WHERE usr_id = ? AND rtr_id = ?'
+    return fetch_one(conn, sql, (usr_id, rtr_id)) is not None
 
 # ---------------------- Routes ----------------------
 
@@ -479,7 +532,7 @@ def profile():
         order_rows = fetch_all(
             conn,
             '''
-            SELECT o.ord_id, o.details, o.status, r.name
+            SELECT o.ord_id, o.details, o.status, r.name, r.rtr_id
             FROM "Order" o
             JOIN "Restaurant" r ON o.rtr_id = r.rtr_id
             WHERE o.usr_id = ?
@@ -488,8 +541,12 @@ def profile():
             (user["usr_id"],)
         )
 
+        # Fetch all existing restaurant reviews for this user in one go
+        reviewed_restaurant_rows = fetch_all(conn, 'SELECT DISTINCT rtr_id FROM "Review" WHERE usr_id = ?', (user["usr_id"],))
+        reviewed_rtr_ids = {r[0] for r in reviewed_restaurant_rows}
+
         orders = []
-        for ord_id, details, status, r_name in order_rows:
+        for ord_id, details, status, r_name, rtr_id in order_rows:
             placed = ""
             total = ""
             if details:
@@ -502,12 +559,26 @@ def profile():
                 except Exception:
                     pass
 
+            # New logic to determine reviewability (Delivered AND Restaurant not yet reviewed)
+            is_delivered = (status or "").lower() == OrderStatus.ORDERED.get_lowercase()
+            is_reviewed = rtr_id in reviewed_rtr_ids
+            is_reviewable = is_delivered and not is_reviewed
+
+            # If reviewable, add the restaurant to the set so subsequent orders from it are marked as 'Reviewed'
+            if is_reviewable:
+                 reviewed_rtr_ids.add(rtr_id)
+            # Re-check the reviewed status after the potential update. This handles orders from the same restaurant correctly.
+            is_reviewed_final = rtr_id in reviewed_rtr_ids and not is_reviewable
+
             orders.append({
                 "id": ord_id,
                 "date": placed,
                 "status": status or "",
                 "restaurant": r_name,
-                "total": total
+                "rtr_id": rtr_id,
+                "total": total,
+                "is_reviewable": is_reviewable,
+                "is_reviewed": is_reviewed_final # <-- CORRECTED: Use the final state for display
             })
 
         # Fetch user's support tickets with order details
@@ -691,6 +762,144 @@ def change_password():
     # Success
     return redirect(url_for('profile', pw_updated=1))
 
+# Wallet Management Routes
+@app.route('/profile/wallet/topup', methods=['POST'])
+def wallet_topup():
+    """
+    Simulate adding funds to the user's wallet.
+    """
+    if session.get('usr_id') is None:
+        return redirect(url_for('login'))
+
+    try:
+        amount_dollars = _money(request.form.get('amount') or 0)
+        amount_cents = _dollars_to_cents(amount_dollars)
+    except Exception:
+        return redirect(url_for('profile', wallet_error='invalid_amount'))
+
+    if amount_cents <= 0:
+        return redirect(url_for('profile', wallet_error='zero_amount'))
+
+    usr_id = session['usr_id']
+    
+    conn = create_connection(db_file)
+    try:
+        # Atomically update the user's wallet balance
+        success = _execute_transaction(conn, [
+            ('UPDATE "User" SET wallet = wallet + ? WHERE usr_id = ?', (amount_cents, usr_id))
+        ])
+
+        if success:
+            # Refresh session and redirect
+            session['Wallet'] = session['Wallet'] + amount_cents
+            return redirect(url_for('profile', wallet_updated='topup'))
+        else:
+            return redirect(url_for('profile', wallet_error='db_failed'))
+    finally:
+        close_connection(conn)
+
+
+@app.route('/profile/wallet/gift', methods=['POST'])
+def wallet_gift():
+    """
+    Transfer funds from the logged-in user to another user by email.
+    """
+    if session.get('usr_id') is None:
+        return redirect(url_for('login'))
+
+    recipient_email = (request.form.get('recipient_email') or '').strip().lower()
+    try:
+        amount_dollars = _money(request.form.get('amount') or 0)
+        amount_cents = _dollars_to_cents(amount_dollars)
+    except Exception:
+        return redirect(url_for('profile', wallet_error='invalid_amount'))
+
+    sender_id = session['usr_id']
+
+    if amount_cents <= 0:
+        return redirect(url_for('profile', wallet_error='zero_amount'))
+    if recipient_email == session.get('Email'):
+        return redirect(url_for('profile', wallet_error='self_gift'))
+
+    conn = create_connection(db_file)
+    try:
+        # 1. Get sender's current balance and recipient's ID
+        sender = fetch_one(conn, 'SELECT wallet FROM "User" WHERE usr_id = ?', (sender_id,))
+        recipient = fetch_one(conn, 'SELECT usr_id FROM "User" WHERE email = ?', (recipient_email,))
+
+        if not sender or not recipient:
+            return redirect(url_for('profile', wallet_error='recipient_not_found'))
+
+        sender_balance = sender[0] or 0
+        recipient_id = recipient[0]
+
+        if sender_balance < amount_cents:
+            return redirect(url_for('profile', wallet_error='insufficient_funds'))
+
+        # 2. Prepare the atomic transaction (two steps: debit and credit)
+        queries_and_params = [
+            # Debit sender
+            ('UPDATE "User" SET wallet = wallet - ? WHERE usr_id = ?', (amount_cents, sender_id)),
+            # Credit recipient
+            ('UPDATE "User" SET wallet = wallet + ? WHERE usr_id = ?', (amount_cents, recipient_id))
+        ]
+
+        # 3. Execute the atomic transaction
+        if _execute_transaction(conn, queries_and_params):
+            # Refresh sender's session wallet value
+            session['Wallet'] = session['Wallet'] - amount_cents
+            return redirect(url_for('profile', wallet_updated='gift'))
+        else:
+            return redirect(url_for('profile', wallet_error='db_failed'))
+    finally:
+        close_connection(conn)
+
+# Review Submission Route (Restaurant-Level)
+@app.route('/review/submit', methods=['POST'])
+def submit_review():
+    """Handles POST request to submit a restaurant-level review."""
+    if session.get('usr_id') is None:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    conn = create_connection(db_file)
+    try:
+        data = request.get_json()
+        usr_id = session['usr_id']
+        rtr_id = int(data.get('restaurant_id')) # New: use restaurant_id
+        rating = int(data.get('rating'))
+        title = (data.get('title') or '').strip()
+        description = (data.get('comment') or '').strip()
+        ord_id = int(data.get('order_id')) # Optional, for context/UI redirection
+
+        if not (1 <= rating <= 5) or rtr_id <= 0:
+            return jsonify({"ok": False, "error": "Invalid rating or restaurant ID"}), 400
+        
+        # 1. Verify the order was actually delivered to allow review submission
+        order_row = fetch_one(conn, 'SELECT status FROM "Order" WHERE ord_id = ? AND usr_id = ? AND rtr_id = ?', (ord_id, usr_id, rtr_id))
+        if not order_row or (order_row[0] or '').lower() != OrderStatus.ORDERED.get_lowercase():
+             return jsonify({"ok": False, "error": "Order not delivered or unauthorized"}), 403
+
+        # 2. Check for existing review (prevent duplicate reviews for the same restaurant by the same user)
+        if _is_restaurant_reviewed(conn, usr_id, rtr_id):
+            return jsonify({"ok": False, "error": "Restaurant already reviewed"}), 409
+
+        # 3. Insert the review into the existing Review table structure
+        execute_query(
+            conn,
+            '''
+            INSERT INTO "Review" (rtr_id, usr_id, title, rating, description)
+            VALUES (?, ?, ?, ?, ?)
+            ''',
+            (rtr_id, usr_id, title, rating, description)
+        )
+
+        return jsonify({"ok": True, "rtr_id": rtr_id}), 201
+    except Exception as e:
+        print(f"Review Submission Error: {e}")
+        return jsonify({"ok": False, "error": "Server error during submission"}), 500
+    finally:
+        close_connection(conn)
+
 # Order route (Calendar "Order" button target)
 @app.route('/order', methods=['GET', 'POST'])
 def order():
@@ -811,13 +1020,66 @@ def order():
             "meal": meal
         }
 
+        # Handle amount being debited from user's wallet
+        total_cents = _dollars_to_cents(total)
+        user_wallet_cents = session.get('Wallet', 0)
+
+        # Quick check based on session to prevent unnecessary transaction attempt
+        if user_wallet_cents < total_cents:
+            return jsonify({"ok": False, "error": "insufficient_funds"}), 402
+
+        # Insert the single order row with status "Ordered" AND debit the wallet atomically
+        conn = create_connection(db_file)
+        new_ord_id = None
+        try:
+            # 1. Prepare queries for atomic transaction: Debit wallet AND Insert order
+            queries_and_params = [
+                # Debit the wallet, using the WHERE clause as an optimistic check against race conditions
+                ('UPDATE "User" SET wallet = wallet - ? WHERE usr_id = ? AND wallet >= ?', (total_cents, usr_id, total_cents)),
+                # Insert the new order
+                ('INSERT INTO "Order" (rtr_id, usr_id, details, status) VALUES (?, ?, ?, ?)', (rtr_id, usr_id, json.dumps(details), OrderStatus.ORDERED.value))
+            ]
+
+            if _execute_transaction(conn, queries_and_params):
+                # Transaction succeeded. Wallet debited and order inserted.
+                # Get the order ID.
+                row = fetch_one(conn, 'SELECT ord_id FROM "Order" WHERE usr_id = ? ORDER BY ord_id DESC LIMIT 1', (usr_id,))
+                new_ord_id = row[0] if row else None
+
+                # Update session wallet to reflect the debit
+                session['Wallet'] = user_wallet_cents - total_cents
+                
+            else:
+                # Transaction failed. Most likely due to the `wallet >= ?` check failing (insufficient funds).
+                # Re-fetch wallet balance to confirm the insufficient funds error.
+                updated_wallet_row = fetch_one(conn, 'SELECT wallet FROM "User" WHERE usr_id = ?', (usr_id,))
+                updated_wallet = updated_wallet_row[0] if updated_wallet_row else 0
+                
+                if updated_wallet < total_cents:
+                    return jsonify({"ok": False, "error": "insufficient_funds"}), 402
+                
+                # Fallback for unexpected DB error during atomic transaction.
+                return jsonify({"ok": False, "error": "db_failed"}), 500
+
+        except Exception as e:
+            print(f"Order Placement Error: {e}")
+            return jsonify({"ok": False, "error": "server_error"}), 500
+
+        finally:
+            close_connection(conn)
+
+        if new_ord_id is None:
+             return jsonify({"ok": False, "error": "order_id_missing"}), 500
+        
+        return jsonify({"ok": True, "ord_id": new_ord_id})
+
         # Insert the single order row with status "Ordered"
         conn = create_connection(db_file)
         try:
             execute_query(conn, '''
                 INSERT INTO "Order" (rtr_id, usr_id, details, status)
                 VALUES (?, ?, ?, ?)
-            ''', (rtr_id, usr_id, json.dumps(details), "Ordered"))
+            ''', (rtr_id, usr_id, json.dumps(details), OrderStatus.ORDERED.value))
             row = fetch_one(conn, 'SELECT last_insert_rowid()')
             new_ord_id = row[0] if row else None
         finally:
@@ -907,7 +1169,7 @@ def order():
         execute_query(conn, '''
             INSERT INTO "Order" (rtr_id, usr_id, details, status)
             VALUES (?, ?, ?, ?)
-        ''', (rtr_id, usr_id, json.dumps(details), "Ordered"))
+        ''', (rtr_id, usr_id, json.dumps(details), OrderStatus.ORDERED.value))
         row = fetch_one(conn, 'SELECT last_insert_rowid()')
         new_ord_id = row[0] if row else None
     finally:
@@ -1005,6 +1267,25 @@ def restaurants():
             FROM "MenuItem"
             WHERE instock IS NULL OR instock = 1
         ''')
+        # Fetch all reviews, including the user's name for display
+        review_rows = fetch_all(conn, '''
+            SELECT 
+                r.rtr_id, r.rating, r.title, r.description, u.first_name, u.last_name
+            FROM "Review" r
+            JOIN "User" u ON r.usr_id = u.usr_id
+            ORDER BY r.rev_id DESC
+        ''')
+
+        reviews_by_rtr = defaultdict(lambda: {'total_rating': 0, 'count': 0, 'list': []})
+        for rtr_id, rating, title, description, first_name, last_name in review_rows:
+            reviews_by_rtr[rtr_id]['total_rating'] += rating
+            reviews_by_rtr[rtr_id]['count'] += 1
+            reviews_by_rtr[rtr_id]['list'].append({
+                "rating": rating,
+                "title": title,
+                "description": description,
+                "user_name": f"{first_name} {last_name}",
+            })
     finally:
         close_connection(conn)
 
@@ -1032,6 +1313,8 @@ def restaurants():
         "hours": r[9] or "",
         "status": r[10] or "",
         "address_full": _addr(r[5], r[6], r[7], r[8]),
+        # ADDED: Include the calculated review data in the list passed to the template
+        "reviews": reviews_by_rtr.get(r[0], {'total_rating': 0, 'count': 0, 'list': []})
     } for r in restaurants]
 
     item_list = [{
