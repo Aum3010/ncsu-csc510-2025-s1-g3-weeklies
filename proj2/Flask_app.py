@@ -5,6 +5,7 @@ import argparse
 import math
 import json
 import calendar
+from enum import Enum
 from io import BytesIO
 from flask import jsonify
 from sqlite3 import IntegrityError
@@ -17,6 +18,18 @@ from flask import Flask, render_template, url_for, redirect, request, session, s
 from proj2.sqlQueries import create_connection, close_connection, fetch_one, fetch_all, execute_query
 from collections import Counter, defaultdict
 from proj2.menu_generation import MenuGenerator
+
+# ----------MANAGE ORDER STATUS--------------
+class OrderStatus(Enum):
+    ORDERED =  'Ordered'
+    PREPARING = 'Preparing'
+    DELIVERED = 'Delivered'
+
+    def get_lowercase(self):
+        return self.value.lower()
+    
+    def get_uppercase(self):
+        return self.value.upper()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
@@ -262,6 +275,12 @@ def build_calendar_cells(gen_map, year, month, items_by_id):
 
     return cells
 
+
+def _is_restaurant_reviewed(conn, usr_id: int, rtr_id: int) -> bool:
+    """Check if the user has already submitted a review for this specific restaurant."""
+    # Checks the existing schema: Review(rev_id, rtr_id, usr_id, title, rating, description)
+    sql = 'SELECT 1 FROM "Review" WHERE usr_id = ? AND rtr_id = ?'
+    return fetch_one(conn, sql, (usr_id, rtr_id)) is not None
 
 # ---------------------- Routes ----------------------
 
@@ -511,7 +530,7 @@ def profile():
         order_rows = fetch_all(
             conn,
             '''
-            SELECT o.ord_id, o.details, o.status, r.name
+            SELECT o.ord_id, o.details, o.status, r.name, r.rtr_id
             FROM "Order" o
             JOIN "Restaurant" r ON o.rtr_id = r.rtr_id
             WHERE o.usr_id = ?
@@ -520,8 +539,12 @@ def profile():
             (user["usr_id"],)
         )
 
+        # Fetch all existing restaurant reviews for this user in one go
+        reviewed_restaurant_rows = fetch_all(conn, 'SELECT DISTINCT rtr_id FROM "Review" WHERE usr_id = ?', (user["usr_id"],))
+        reviewed_rtr_ids = {r[0] for r in reviewed_restaurant_rows}
+
         orders = []
-        for ord_id, details, status, r_name in order_rows:
+        for ord_id, details, status, r_name, rtr_id in order_rows:
             placed = ""
             total = ""
             if details:
@@ -534,12 +557,26 @@ def profile():
                 except Exception:
                     pass
 
+            # New logic to determine reviewability (Delivered AND Restaurant not yet reviewed)
+            is_delivered = (status or "").lower() == OrderStatus.DELIVERED.get_lowercase()
+            is_reviewed = rtr_id in reviewed_rtr_ids
+            is_reviewable = is_delivered and not is_reviewed
+
+            # If reviewable, add the restaurant to the set so subsequent orders from it are marked as 'Reviewed'
+            if is_reviewable:
+                 reviewed_rtr_ids.add(rtr_id)
+            # Re-check the reviewed status after the potential update. This handles orders from the same restaurant correctly.
+            is_reviewed_final = rtr_id in reviewed_rtr_ids and not is_reviewable
+
             orders.append({
                 "id": ord_id,
                 "date": placed,
                 "status": status or "",
                 "restaurant": r_name,
-                "total": total
+                "rtr_id": rtr_id,
+                "total": total,
+                "is_reviewable": is_reviewable,
+                "is_reviewed": is_reviewed_final # <-- CORRECTED: Use the final state for display
             })
     finally:
         close_connection(conn)
@@ -780,6 +817,52 @@ def wallet_gift():
     finally:
         close_connection(conn)
 
+# Review Submission Route (Restaurant-Level)
+@app.route('/review/submit', methods=['POST'])
+def submit_review():
+    """Handles POST request to submit a restaurant-level review."""
+    if session.get('usr_id') is None:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    conn = create_connection(db_file)
+    try:
+        data = request.get_json()
+        usr_id = session['usr_id']
+        rtr_id = int(data.get('restaurant_id')) # New: use restaurant_id
+        rating = int(data.get('rating'))
+        title = (data.get('title') or '').strip()
+        description = (data.get('comment') or '').strip()
+        ord_id = int(data.get('order_id')) # Optional, for context/UI redirection
+
+        if not (1 <= rating <= 5) or rtr_id <= 0:
+            return jsonify({"ok": False, "error": "Invalid rating or restaurant ID"}), 400
+        
+        # 1. Verify the order was actually delivered to allow review submission
+        order_row = fetch_one(conn, 'SELECT status FROM "Order" WHERE ord_id = ? AND usr_id = ? AND rtr_id = ?', (ord_id, usr_id, rtr_id))
+        if not order_row or (order_row[0] or '').lower() != OrderStatus.DELIVERED.get_lowercase():
+             return jsonify({"ok": False, "error": "Order not delivered or unauthorized"}), 403
+
+        # 2. Check for existing review (prevent duplicate reviews for the same restaurant by the same user)
+        if _is_restaurant_reviewed(conn, usr_id, rtr_id):
+            return jsonify({"ok": False, "error": "Restaurant already reviewed"}), 409
+
+        # 3. Insert the review into the existing Review table structure
+        execute_query(
+            conn,
+            '''
+            INSERT INTO "Review" (rtr_id, usr_id, title, rating, description)
+            VALUES (?, ?, ?, ?, ?)
+            ''',
+            (rtr_id, usr_id, title, rating, description)
+        )
+
+        return jsonify({"ok": True, "rtr_id": rtr_id}), 201
+    except Exception as e:
+        print(f"Review Submission Error: {e}")
+        return jsonify({"ok": False, "error": "Server error during submission"}), 500
+    finally:
+        close_connection(conn)
+
 # Order route (Calendar "Order" button target)
 @app.route('/order', methods=['GET', 'POST'])
 def order():
@@ -906,7 +989,7 @@ def order():
             execute_query(conn, '''
                 INSERT INTO "Order" (rtr_id, usr_id, details, status)
                 VALUES (?, ?, ?, ?)
-            ''', (rtr_id, usr_id, json.dumps(details), "Ordered"))
+            ''', (rtr_id, usr_id, json.dumps(details), OrderStatus.ORDERED.value))
             row = fetch_one(conn, 'SELECT last_insert_rowid()')
             new_ord_id = row[0] if row else None
         finally:
@@ -996,7 +1079,7 @@ def order():
         execute_query(conn, '''
             INSERT INTO "Order" (rtr_id, usr_id, details, status)
             VALUES (?, ?, ?, ?)
-        ''', (rtr_id, usr_id, json.dumps(details), "Ordered"))
+        ''', (rtr_id, usr_id, json.dumps(details), OrderStatus.ORDERED.value))
         row = fetch_one(conn, 'SELECT last_insert_rowid()')
         new_ord_id = row[0] if row else None
     finally:

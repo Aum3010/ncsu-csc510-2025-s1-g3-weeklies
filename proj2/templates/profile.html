@@ -224,6 +224,7 @@
                     <th scope="col">Status</th>
                     <th scope="col">Receipt</th>
                     <th scope="col">Total</th>
+                    <th scope="col">Review</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -259,6 +260,23 @@
                       </a>
                     </td>
                     <td>{{ order.total }}</td>
+                    <td>
+                      {% if order.is_reviewable %}
+                      <button 
+                        class="btn btn-primary btn-sm open-review-modal-btn"
+                        data-order-id="{{ order.id }}"
+                        data-restaurant-id="{{ order.rtr_id }}"
+                        data-restaurant-name="{{ order.restaurant }}"
+                      >
+                        Review
+                      </button>
+                      {% elif order.is_reviewed %}
+                        {% set s = order.status|lower %}
+                        {% if s == 'delivered' %}
+                          <span class="text-muted" style="font-size: 13px;">Reviewed</span>
+                        {% endif %}
+                      {% endif %}
+                    </td>
                   </tr>
                   {% endfor %}
                 </tbody>
@@ -420,6 +438,39 @@
           <button type="button" class="btn btn-primary" id="okErrorBtn">OK</button>
         </div>
       </div>
+
+      <!-- Add review modal functionality -->
+      <div id="reviewModalBackdrop" class="modal-backdrop" aria-hidden="true"></div>
+      <div id="reviewModal" class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle" aria-hidden="true">
+        <div class="modal-head">
+            <h3 id="reviewModalTitle" style="margin:0; font-size:18px;">Leave a Review</h3>
+            <button type="button" class="btn btn-outline btn-sm" id="closeReviewModalBtn" aria-label="Close">Close</button>
+        </div>
+        <form id="reviewForm" class="modal-body" novalidate>
+            <input type="hidden" id="reviewOrderId">
+            <input type="hidden" id="reviewRestaurantId">
+            
+            <p>Reviewing: <strong id="reviewRestaurantName"></strong></p>
+
+            <div class="form-row">
+                <label for="reviewTitle">Review Title</label>
+                <input class="input" id="reviewTitle" name="title" type="text" maxlength="100" required>
+            </div>
+            <div class="form-row" style="margin-top:10px;">
+                <label for="reviewRating">Rating (1-5)</label>
+                <input class="input" id="reviewRating" name="rating" type="number" min="1" max="5" required>
+            </div>
+            <div class="form-row" style="margin-top:10px;">
+                <label for="reviewComment">Description (Optional)</label>
+                <textarea class="input" id="reviewComment" name="comment" rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" id="cancelReviewBtn">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="submitReviewBtn">Submit Review</button>
+            </div>
+        </form>
+      </div>
+
     </main>
 
     <footer class="footer">
@@ -899,6 +950,100 @@
           
           showErrorModal(message);
           
+      })();
+
+      // New JS for Restaurant Review Modal
+      (function setupReviewModal() {
+          const modal = document.getElementById('reviewModal');
+          const backdrop = document.getElementById('reviewModalBackdrop');
+          const closeBtn = document.getElementById('closeReviewModalBtn');
+          const cancelBtn = document.getElementById('cancelReviewBtn');
+          const form = document.getElementById('reviewForm');
+          const orderIdInput = document.getElementById('reviewOrderId');
+          const rtrIdInput = document.getElementById('reviewRestaurantId');
+          const rtrNameEl = document.getElementById('reviewRestaurantName');
+          const titleInput = document.getElementById('reviewTitle');
+          const ratingInput = document.getElementById('reviewRating');
+          const commentInput = document.getElementById('reviewComment');
+
+          function showModal(orderId, rtrId, rtrName) {
+              orderIdInput.value = orderId;
+              rtrIdInput.value = rtrId;
+              rtrNameEl.textContent = rtrName;
+              
+              modal.classList.add('show');
+              backdrop.classList.add('show');
+          }
+
+          // This reloads the page to update the "Review" button status (simplest way)
+          function hideModal() {
+              modal.classList.remove('show');
+              backdrop.classList.remove('show');
+              form.reset();
+              // Reload profile to reflect new review status
+              window.location.href = window.location.origin + window.location.pathname; 
+          }
+
+          // Attach listeners to all "Review" buttons
+          document.querySelectorAll('.open-review-modal-btn').forEach(btn => {
+              btn.addEventListener('click', () => {
+                  const orderId = btn.dataset.orderId;
+                  const rtrId = btn.dataset.restaurantId;
+                  const rtrName = btn.dataset.restaurantName;
+                  showModal(orderId, rtrId, rtrName);
+              });
+          });
+
+          closeBtn.addEventListener('click', hideModal);
+          cancelBtn.addEventListener('click', hideModal);
+          backdrop.addEventListener('click', hideModal);
+          
+          // Form submission handler
+          form.addEventListener('submit', async function(e) {
+              e.preventDefault();
+              
+              const payload = {
+                  order_id: orderIdInput.value,
+                  restaurant_id: rtrIdInput.value,
+                  rating: ratingInput.value,
+                  title: titleInput.value,
+                  comment: commentInput.value
+              };
+              
+              // Basic validation
+              if (!payload.restaurant_id || !payload.title || !payload.rating || payload.rating < 1 || payload.rating > 5) {
+                  alert("Please provide a title and a valid rating (1-5).");
+                  return;
+              }
+
+              try {
+                  const response = await fetch('{{ url_for("submit_review") }}', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(payload)
+                  });
+
+                  const result = await response.json();
+
+                  if (result.ok) {
+                      alert(`Review for ${rtrNameEl.textContent} submitted successfully!`);
+                      hideModal(); // This will also reload the page
+                  } else {
+                      alert('Review failed: ' + (result.error || 'Unknown error'));
+                  }
+              } catch (error) {
+                  alert('A network error occurred: ' + error.message);
+              }
+          });
+
+          // Add escape key handler for the new review modal
+          document.addEventListener('keydown', (e) => {
+              // Ensure the modal exists and is shown
+              if (e.key === 'Escape' && document.getElementById('reviewModal').classList.contains('show')) {
+                  hideModal();
+              }
+          });
+
       })();
       });
 
