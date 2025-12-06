@@ -22,6 +22,9 @@
           <a href="{{ url_for('restaurants') }}">Restaurants</a>
           <a href="{{ url_for('orders') }}">Order</a>
           <a href="{{ url_for('db_view') }}">DB</a>
+          {% if session.get('is_admin') %}
+          <a href="{{ url_for('admin_dashboard') }}">Admin</a>
+          {% endif %}
           <a href="{{ url_for('logout') }}" data-confirm="Log out now?"
             >Logout</a
           >
@@ -60,6 +63,35 @@
           Password change failed. Please try again.
         </div>
         {% endif %} {% endif %}
+
+        {% if request.args.get('ticket_success') %}
+        <div class="flash success">
+          Support ticket #{{ request.args.get('ticket_id') }} submitted successfully! We'll respond as soon as possible.
+        </div>
+        {% elif request.args.get('ticket_error') %}
+        {% set ticket_error = request.args.get('ticket_error') %}
+        {% if ticket_error == 'message_too_short' %}
+        <div class="flash danger">
+          Ticket message must be at least 10 characters long.
+        </div>
+        {% elif ticket_error == 'order_not_found' %}
+        <div class="flash danger">
+          Order not found. Please try again.
+        </div>
+        {% elif ticket_error == 'unauthorized' %}
+        <div class="flash danger">
+          You can only report issues for your own orders.
+        </div>
+        {% elif ticket_error == 'invalid_order' %}
+        <div class="flash danger">
+          Invalid order ID. Please try again.
+        </div>
+        {% else %}
+        <div class="flash danger">
+          Failed to submit ticket. Please try again.
+        </div>
+        {% endif %}
+        {% endif %}
 
         <div class="card max-w-lg" style="max-width: var(--container)">
           <!-- NEW: header row with title + Edit button -->
@@ -183,11 +215,11 @@
                   <tr>
                     <th scope="col">Order ID</th>
                     <th scope="col">Restaurant</th>
-                    <!-- NEW -->
                     <th scope="col">Date</th>
                     <th scope="col">Status</th>
                     <th scope="col">Receipt</th>
                     <th scope="col">Total</th>
+                    <th scope="col">Support</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -195,7 +227,6 @@
                   <tr>
                     <td>{{ order.id }}</td>
                     <td>{{ order.restaurant }}</td>
-                    <!-- NEW -->
                     <td>{{ order.date }}</td>
                     <td>
                       {% set s = order.status|lower %} {% if s == 'delivered' %}
@@ -223,6 +254,15 @@
                       </a>
                     </td>
                     <td>{{ order.total }}</td>
+                    <td>
+                      <button
+                        class="btn btn-outline btn-sm report-issue-btn"
+                        data-order-id="{{ order.id }}"
+                        data-restaurant="{{ order.restaurant }}"
+                      >
+                        Report Issue
+                      </button>
+                    </td>
                   </tr>
                   {% endfor %}
                 </tbody>
@@ -230,6 +270,46 @@
             </div>
             {% else %}
             <p>No orders found.</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- My Support Tickets -->
+        <div class="page-title" style="margin-top: 20px">
+          <h1>My Support Tickets</h1>
+        </div>
+
+        <div class="card max-w-lg" style="max-width: var(--container)">
+          <div class="card-body">
+            {% if tickets %}
+            <div class="tickets-list">
+              {% for ticket in tickets %}
+              <div class="ticket-item">
+                <div class="ticket-header">
+                  <div class="ticket-meta">
+                    <span class="ticket-id">Ticket #{{ ticket.ticket_id }}</span>
+                    <span class="ticket-order">Order #{{ ticket.ord_id }}</span>
+                    <span class="ticket-date">{{ ticket.created_at }}</span>
+                  </div>
+                  <span class="ticket-status ticket-status-{{ ticket.status|lower|replace(' ', '-') }}">
+                    {{ ticket.status }}
+                  </span>
+                </div>
+                <div class="ticket-message">
+                  <strong>Your Message:</strong>
+                  <p>{{ ticket.message }}</p>
+                </div>
+                {% if ticket.response %}
+                <div class="ticket-response">
+                  <strong>Admin Response:</strong>
+                  <p>{{ ticket.response }}</p>
+                </div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p>No support tickets found.</p>
             {% endif %}
           </div>
         </div>
@@ -308,6 +388,75 @@
               disabled
             >
               Update Password
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Report Issue Modal -->
+      <div id="ticketModalBackdrop" class="modal-backdrop" aria-hidden="true"></div>
+      <div
+        id="ticketModal"
+        class="modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ticketModalTitle"
+        aria-hidden="true"
+      >
+        <div class="modal-head">
+          <h3 id="ticketModalTitle" style="margin: 0; font-size: 18px">
+            Report Order Issue
+          </h3>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            id="closeTicketModalBtn"
+            aria-label="Close"
+          >
+            Close
+          </button>
+        </div>
+        <form
+          id="ticketForm"
+          class="modal-body"
+          method="POST"
+          action="{{ url_for('support_submit') }}"
+        >
+          <div class="form-row">
+            <label for="ticketOrderId">Order Number</label>
+            <input
+              class="input"
+              id="ticketOrderId"
+              name="ord_id"
+              type="text"
+              readonly
+            />
+          </div>
+          <div class="form-row" style="margin-top: 10px">
+            <label for="ticketMessage">Describe your issue</label>
+            <textarea
+              class="input"
+              id="ticketMessage"
+              name="message"
+              rows="5"
+              placeholder="Please describe the issue with your order (minimum 10 characters)"
+              required
+            ></textarea>
+            <div class="char-counter" id="charCounter">
+              <span id="charCount">0</span> / 10 characters minimum
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline" id="cancelTicketBtn">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="btn btn-primary"
+              id="submitTicketBtn"
+              disabled
+            >
+              Submit Report
             </button>
           </div>
         </form>
@@ -483,6 +632,106 @@
       }
       .reqs .bad {
         color: #dc3545;
+      }
+
+      /* Ticket Styles */
+      .tickets-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .ticket-item {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        background: var(--surface);
+      }
+      .ticket-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .ticket-meta {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 14px;
+      }
+      .ticket-id {
+        font-weight: 700;
+        color: var(--text);
+      }
+      .ticket-order {
+        color: var(--muted);
+      }
+      .ticket-date {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .ticket-status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .ticket-status-open {
+        background-color: #ffc107;
+      }
+      .ticket-status-in-progress {
+        background-color: #fd7e14;
+      }
+      .ticket-status-resolved {
+        background-color: #28a745;
+      }
+      .ticket-status-closed {
+        background-color: #6c757d;
+      }
+      .ticket-message {
+        margin-bottom: 12px;
+      }
+      .ticket-message strong,
+      .ticket-response strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .ticket-message p,
+      .ticket-response p {
+        margin: 0;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.03);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+      }
+      .ticket-response {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+      .ticket-response p {
+        background: rgba(40, 167, 69, 0.05);
+        border-color: rgba(40, 167, 69, 0.2);
+      }
+      .char-counter {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .char-counter.valid {
+        color: #28a745;
+      }
+      .char-counter.invalid {
+        color: #ffc107;
       }
     </style>
     <script>
@@ -669,6 +918,91 @@
         // initial
         update();
       });
+
+      // Ticket Modal Logic
+      (function() {
+        const ticketModal = document.getElementById('ticketModal');
+        const ticketBackdrop = document.getElementById('ticketModalBackdrop');
+        const ticketForm = document.getElementById('ticketForm');
+        const ticketOrderId = document.getElementById('ticketOrderId');
+        const ticketMessage = document.getElementById('ticketMessage');
+        const charCount = document.getElementById('charCount');
+        const charCounter = document.getElementById('charCounter');
+        const submitTicketBtn = document.getElementById('submitTicketBtn');
+        const closeTicketModalBtn = document.getElementById('closeTicketModalBtn');
+        const cancelTicketBtn = document.getElementById('cancelTicketBtn');
+        const reportIssueBtns = document.querySelectorAll('.report-issue-btn');
+
+        function showTicketModal(orderId, restaurant) {
+          ticketOrderId.value = `#${orderId} - ${restaurant}`;
+          ticketOrderId.dataset.orderId = orderId;
+          ticketMessage.value = '';
+          updateCharCount();
+          ticketModal.classList.add('show');
+          ticketBackdrop.classList.add('show');
+          setTimeout(() => ticketMessage.focus(), 0);
+        }
+
+        function hideTicketModal() {
+          ticketModal.classList.remove('show');
+          ticketBackdrop.classList.remove('show');
+          ticketForm.reset();
+        }
+
+        function updateCharCount() {
+          const length = ticketMessage.value.trim().length;
+          charCount.textContent = length;
+          
+          if (length >= 10) {
+            charCounter.classList.add('valid');
+            charCounter.classList.remove('invalid');
+            submitTicketBtn.disabled = false;
+          } else {
+            charCounter.classList.remove('valid');
+            charCounter.classList.add('invalid');
+            submitTicketBtn.disabled = true;
+          }
+        }
+
+        // Wire up report issue buttons
+        reportIssueBtns.forEach(btn => {
+          btn.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            const restaurant = this.dataset.restaurant;
+            showTicketModal(orderId, restaurant);
+          });
+        });
+
+        // Close modal handlers
+        closeTicketModalBtn && closeTicketModalBtn.addEventListener('click', hideTicketModal);
+        cancelTicketBtn && cancelTicketBtn.addEventListener('click', hideTicketModal);
+        ticketBackdrop && ticketBackdrop.addEventListener('click', hideTicketModal);
+
+        // Character counter
+        ticketMessage && ticketMessage.addEventListener('input', updateCharCount);
+
+        // Form submission - update hidden field with actual order ID
+        ticketForm && ticketForm.addEventListener('submit', function(e) {
+          const actualOrderId = ticketOrderId.dataset.orderId;
+          if (actualOrderId) {
+            // Create a hidden input with the actual order ID
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'ord_id';
+            hiddenInput.value = actualOrderId;
+            ticketForm.appendChild(hiddenInput);
+            // Remove the name from the visible input so it doesn't submit
+            ticketOrderId.removeAttribute('name');
+          }
+        });
+
+        // Escape key to close
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && ticketModal.classList.contains('show')) {
+            hideTicketModal();
+          }
+        });
+      })();
     </script>
   </body>
 </html>
