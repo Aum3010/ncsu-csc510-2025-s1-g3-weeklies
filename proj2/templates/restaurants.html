@@ -294,6 +294,47 @@
       border-color: rgba(91, 140, 255, 0.5) !important;
       box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.1) !important;
     }
+
+    /* ADDED STYLES FOR REVIEWS */
+    .review-summary { 
+        margin-left: 10px; 
+        font-weight: 600; 
+        color: #ffd700; /* Gold color for stars/rating */
+    }
+    .reviews-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(91, 140, 255, 0.3);
+    }
+    .reviews-section h4 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 1.1rem;
+        color: #5b8cff;
+    }
+    .review-item {
+        padding: 12px 0;
+        border-bottom: 1px dashed rgba(91, 140, 255, 0.2);
+    }
+    .review-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    .review-rating {
+        font-size: 1.2rem;
+        color: #ffd700;
+    }
+    .review-title {
+        font-weight: 700;
+        margin-top: 4px;
+        margin-bottom: 2px;
+    }
+    .review-meta {
+        font-size: 0.8rem;
+        color: var(--muted, #a9afc1);
+        margin-top: 4px;
+    }
+    /* END ADDED STYLES */
     
     /* Page title enhancement */
     .main h1 {
@@ -362,6 +403,12 @@
 <div id="toast" class="toast">Added to cart.</div>
 
 <script>
+  // ---------- UI helpers (Star Rating) ----------
+  function renderStars(rating) {
+    const full = '★';
+    const empty = '☆';
+    return full.repeat(Math.floor(rating)) + empty.repeat(5 - Math.floor(rating));
+  }
   // ---------- Data ----------
   const RESTS = window.__RESTS__ || [];
   const ITEMS = window.__ITEMS__ || [];
@@ -505,12 +552,21 @@
       header.className = 'accordion-header';
       header.setAttribute('role', 'button');
       header.setAttribute('aria-expanded', 'false');
+
+      // Review summary calculation and display
+      const rev = (r.reviews && r.reviews.list) || [];
+      console.log(`r=${r}\n`)
+      console.log(`r.reviews=${r.reviews}\n`)
+      const avgRating = rev.count > 0 ? (rev.total_rating / rev.count).toFixed(1) : '—';
+      const reviewSummaryHtml = rev.count > 0 
+        ? `<span class="review-summary">${avgRating} ${renderStars(avgRating)} (${rev.count})</span>`
+        : `<span class="review-summary">No Reviews</span>`;
       
       const addr = formatAddress(r);
       const formattedHours = r.hours ? formatHours(r.hours) : '';
       const infoHtml = `
         <div>
-          <h3>${r.name}</h3>
+          <h3>${r.name}${reviewSummaryHtml}</h3>
           <div class="meta-info">
             ${addr ? `<div>📍 ${addr}</div>` : ''}
             ${formattedHours ? `<div>🕐 ${formattedHours}</div>` : ''}
@@ -559,6 +615,34 @@
           });
           content.appendChild(row);
         }
+        // ADDED: Reviews Section
+        const reviewsData = (r.reviews && r.reviews.list) || [];
+        const reviewSectionEl = document.createElement('div');
+        reviewSectionEl.className = 'reviews-section';
+
+        if (reviewsData.length > 0) {
+          const reviewsHtml = reviewsData.map(rev => `
+            <div class="review-item">
+              <div class="review-rating">${renderStars(rev.rating)}</div>
+              <div class="review-title">${rev.title || 'No Title'}</div>
+              <div class="desc">${rev.description || 'No comment provided.'}</div>
+              <div class="review-meta">By ${rev.user_name}</div>
+            </div>
+          `).join('');
+
+          reviewSectionEl.innerHTML = `
+            <h4>Customer Reviews (${reviewsData.length})</h4>
+            <div class="reviews-list">${reviewsHtml}</div>
+          `;
+        } else {
+          reviewSectionEl.innerHTML = `
+            <div class="meta" style="padding:12px;">No customer reviews submitted yet.</div>
+          `;
+        }
+        
+        // Safely append the newly created review element to the content
+        content.appendChild(reviewSectionEl);
+        // END ADDED REVIEWS SECTION
       }
 
       header.addEventListener('click', () => {

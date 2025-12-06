@@ -558,7 +558,7 @@ def profile():
                     pass
 
             # New logic to determine reviewability (Delivered AND Restaurant not yet reviewed)
-            is_delivered = (status or "").lower() == OrderStatus.DELIVERED.get_lowercase()
+            is_delivered = (status or "").lower() == OrderStatus.ORDERED.get_lowercase()
             is_reviewed = rtr_id in reviewed_rtr_ids
             is_reviewable = is_delivered and not is_reviewed
 
@@ -839,7 +839,7 @@ def submit_review():
         
         # 1. Verify the order was actually delivered to allow review submission
         order_row = fetch_one(conn, 'SELECT status FROM "Order" WHERE ord_id = ? AND usr_id = ? AND rtr_id = ?', (ord_id, usr_id, rtr_id))
-        if not order_row or (order_row[0] or '').lower() != OrderStatus.DELIVERED.get_lowercase():
+        if not order_row or (order_row[0] or '').lower() != OrderStatus.ORDERED.get_lowercase():
              return jsonify({"ok": False, "error": "Order not delivered or unauthorized"}), 403
 
         # 2. Check for existing review (prevent duplicate reviews for the same restaurant by the same user)
@@ -1177,6 +1177,25 @@ def restaurants():
             FROM "MenuItem"
             WHERE instock IS NULL OR instock = 1
         ''')
+        # Fetch all reviews, including the user's name for display
+        review_rows = fetch_all(conn, '''
+            SELECT 
+                r.rtr_id, r.rating, r.title, r.description, u.first_name, u.last_name
+            FROM "Review" r
+            JOIN "User" u ON r.usr_id = u.usr_id
+            ORDER BY r.rev_id DESC
+        ''')
+
+        reviews_by_rtr = defaultdict(lambda: {'total_rating': 0, 'count': 0, 'list': []})
+        for rtr_id, rating, title, description, first_name, last_name in review_rows:
+            reviews_by_rtr[rtr_id]['total_rating'] += rating
+            reviews_by_rtr[rtr_id]['count'] += 1
+            reviews_by_rtr[rtr_id]['list'].append({
+                "rating": rating,
+                "title": title,
+                "description": description,
+                "user_name": f"{first_name} {last_name}",
+            })
     finally:
         close_connection(conn)
 
