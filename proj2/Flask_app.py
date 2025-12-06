@@ -1223,6 +1223,8 @@ def restaurants():
         "hours": r[9] or "",
         "status": r[10] or "",
         "address_full": _addr(r[5], r[6], r[7], r[8]),
+        # ADDED: Include the calculated review data in the list passed to the template
+        "reviews": reviews_by_rtr.get(r[0], {'total_rating': 0, 'count': 0, 'list': []})
     } for r in restaurants]
 
     item_list = [{

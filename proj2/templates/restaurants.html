@@ -554,7 +554,8 @@
       header.setAttribute('aria-expanded', 'false');
 
       // Review summary calculation and display
-      const rev = (r.reviews && r.reviews.list) || [];
+      // Ensure 'rev' is the aggregation object, not the list, and default safely.
+      const rev = r.reviews || { count: 0, total_rating: 0, list: [] };
       console.log(`r=${r}\n`)
       console.log(`r.reviews=${r.reviews}\n`)
       const avgRating = rev.count > 0 ? (rev.total_rating / rev.count).toFixed(1) : '—';
@@ -616,7 +617,8 @@
           content.appendChild(row);
         }
         // ADDED: Reviews Section
-        const reviewsData = (r.reviews && r.reviews.list) || [];
+        // Use the 'list' property from the aggregated 'rev' object, which now defaults safely.
+        const reviewsData = rev.list || [];
         const reviewSectionEl = document.createElement('div');
         reviewSectionEl.className = 'reviews-section';
 
