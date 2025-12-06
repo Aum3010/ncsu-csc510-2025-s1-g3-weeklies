@@ -388,6 +388,38 @@
           </div>
         </form>
       </div>
+
+      <!--Error Modal Box in case of Top Up or Gifting failure-->
+      <div id="errorModalBackdrop" class="modal-backdrop" aria-hidden="true"></div>
+      <div
+        id="errorModal"
+        class="modal-sheet"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="errorModalTitle"
+        aria-describedby="errorModalMessage"
+        aria-hidden="true"
+      >
+        <div class="modal-head" style="border-color: var(--danger-border); background-color: var(--danger-surface);">
+          <h3 id="errorModalTitle" style="margin: 0; font-size: 18px; color: var(--danger)">
+            Transaction Failed
+          </h3>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            id="closeErrorModalBtn"
+            aria-label="Close"
+          >
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <p id="errorModalMessage" style="margin-bottom: 0;">[Error message will be inserted here]</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" id="okErrorBtn">OK</button>
+        </div>
+      </div>
     </main>
 
     <footer class="footer">
@@ -804,6 +836,70 @@
             hideGiftModal();
           }
         });
+
+        // NEW: Error Modal Logic
+      const errorModal = document.getElementById('errorModal');
+      const errorBackdrop = document.getElementById('errorModalBackdrop');
+      const closeErrorBtn = document.getElementById('closeErrorModalBtn');
+      const okErrorBtn = document.getElementById('okErrorBtn');
+      const errorMsgEl = document.getElementById('errorModalMessage');
+
+      function showErrorModal(message) {
+        errorMsgEl.textContent = message;
+        errorModal.classList.add('show');
+        errorBackdrop.classList.add('show');
+        setTimeout(() => okErrorBtn.focus(), 0);
+      }
+      function hideErrorModal() {
+        errorModal.classList.remove('show');
+        errorBackdrop.classList.remove('show');
+        // Clean the URL error parameter after showing the modal
+        if (window.history.replaceState) {
+            const url = new URL(window.location);
+            url.searchParams.delete('wallet_error');
+            window.history.replaceState({}, '', url);
+        }
+      }
+
+      closeErrorBtn && closeErrorBtn.addEventListener('click', hideErrorModal);
+      okErrorBtn && okErrorBtn.addEventListener('click', hideErrorModal);
+      errorBackdrop && errorBackdrop.addEventListener('click', hideErrorModal);
+
+      // Update escape key handler for all modals
+      document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            hideTopupModal();
+            hideGiftModal();
+            hideErrorModal(); // Added
+          }
+        });
+        
+      // --- Wallet Error Handling on Redirect (Updated) ---
+      (function checkWalletErrorRedirect() {
+          const urlParams = new URLSearchParams(window.location.search);
+          const error = urlParams.get('wallet_error');
+
+          if (!error) return;
+
+          // Map backend error codes to user-friendly messages for the modal
+          const errorMessages = {
+              'invalid_amount': 'The amount specified is invalid. Please enter a valid currency amount.',
+              'zero_amount': 'The amount must be greater than zero.',
+              'self_gift': 'Cannot gift funds to yourself. Please specify a different recipient.',
+              'recipient_not_found': 'The recipient email was not found in our system.',
+              'insufficient_funds': 'Insufficient funds in your wallet to complete this transfer.',
+              'db_failed': 'A database error occurred during the transaction. Please try again.',
+              // Include the generic case
+              'db_failed_topup': 'A database error occurred during the top-up transaction. Please try again.',
+              'invalid_amount_topup': 'The top-up amount is invalid or less than minimum.'
+          };
+
+          // Use the static flash message text from the Jinja template as a fallback/primary message.
+          const message = errorMessages[error] || 'A wallet operation failed. Please check your inputs and try again.';
+          
+          showErrorModal(message);
+          
+      })();
       });
 
     </script>
