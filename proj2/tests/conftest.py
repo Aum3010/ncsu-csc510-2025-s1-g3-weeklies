@@ -9,6 +9,8 @@ import types
 import pytest
 import sqlite3
 
+from playwright.sync_api import sync_playwright
+
 # Import your app module
 import proj2.Flask_app as Flask_app
 
@@ -156,3 +158,45 @@ def monkeypatch_pdf(monkeypatch):
     def fake_pdf(db_path, ord_id):
         return b"%PDF-1.4\n%fake\n"
     monkeypatch.setattr("proj2.Flask_app.generate_order_receipt_pdf", fake_pdf, raising=True)
+
+# =========================================================
+# E2E Fixtures (Required for Playwright tests)
+# =========================================================
+
+# Note: These fixtures use standard pytest-playwright patterns.
+# The 'browser' and 'browser_context' fixtures ensure the browser environment
+# is set up once per test session or as needed.
+
+@pytest.fixture(scope="session")
+def browser():
+    """Launches a Playwright Chromium browser instance once per test session."""
+    # Note: Headless is typically True for CI. Set to False for local debugging.
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        yield browser
+        browser.close()
+
+@pytest.fixture(scope="session")
+def browser_context(browser):
+    """Creates a new isolated browser context for the session."""
+    context = browser.new_context()
+    yield context
+    context.close()
+
+@pytest.fixture(scope="function")
+def page(browser_context):
+    """
+    The main fixture for E2E testing. Returns a Playwright Page instance
+    for interacting with the web application for a single test function.
+    """
+    page = browser_context.new_page()
+    yield page
+    page.close()
+    
+# NOTE ON base_url: The E2E tests require a 'base_url' fixture.
+# If you are using pytest-flask, the 'live_server' fixture usually provides this.
+# If you are running your Flask app separately, uncomment and define the base_url manually:
+@pytest.fixture(scope="session")
+def base_url():
+    # Ensure this matches the host:port where your Flask app is running (e.g., in a separate terminal)
+    return "http://127.0.0.1:5000"
