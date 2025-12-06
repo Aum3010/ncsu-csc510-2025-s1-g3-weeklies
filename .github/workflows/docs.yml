@@ -38,7 +38,7 @@ jobs:
 
       - name: Build API docs (pdoc) + convert Markdown pages
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/proj2:${{ github.workspace }}
         run: |
           rm -rf proj2/site
           pdoc proj2 --no-show-source --template-dir proj2/pdoc_templates -o proj2/site
