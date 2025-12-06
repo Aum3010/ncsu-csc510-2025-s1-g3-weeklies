@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login · Weeklies</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="logo" aria-hidden="true"></span> Weeklies
+    </a>
+    <nav>
+      <a href="{{ url_for('login') }}">Login</a>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  <div class="container">
+    {% if error %}
+    <div class="flash danger" data-autohide="4500">{{ error }}</div>
+    {% endif %}
+
+    <div class="auth">
+      <div class="card compact">
+        <div class="card-header" style="font-size: 1.5rem;">Login</div>
+        <div class="card-body">
+          <form action="{{ url_for('login') }}" method="post">
+            <label for="email">Email</label>
+            <input class="input" type="email" id="email" name="email" required />
+
+            <label for="password">Password</label>
+            <input class="input" type="password" id="password" name="password" required />
+
+            <br>
+
+            <input type="submit" value="Login" class="btn btn-primary btn-block" />
+            <a href="{{ url_for('register') }}" class="btn btn-secondary btn-block">Register</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">© 2025 Weeklies</div>
+</footer>
+
+<style>
+  /* Local styles for centering the login card */
+  main.main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  /* Keep container from collapsing card width */
+  main.main .container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Ensure auth card stays at its natural max-width */
+  .auth {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* reduce vertical padding inside the card */
+  .auth .card.compact .card-body {
+    padding: .1rem;
+  }
+</style>
+
+</body>
+</html>
