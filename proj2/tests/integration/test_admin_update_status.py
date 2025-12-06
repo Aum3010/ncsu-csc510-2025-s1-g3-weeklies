@@ -9,7 +9,7 @@ import pytest
 from sqlQueries import create_connection, close_connection, execute_query, fetch_one
 
 
-def test_update_status_success(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_status_success(client, temp_db_path, seed_minimal_data, admin_session):
     """Test successful order status update with valid transition."""
     # Create an order with status "Ordered"
     conn = create_connection(temp_db_path)
@@ -44,7 +44,7 @@ def test_update_status_success(client, temp_db_path, seed_minimal_data, login_se
         close_connection(conn)
 
 
-def test_update_status_invalid_order_id(client, login_session):
+def test_update_status_invalid_order_id(client, admin_session):
     """Test updating status for non-existent order returns 404."""
     response = client.post('/admin/update_status',
                           data=json.dumps({"ord_id": 99999, "new_status": "Preparing"}),
@@ -56,7 +56,7 @@ def test_update_status_invalid_order_id(client, login_session):
     assert "not found" in data["error"].lower()
 
 
-def test_update_status_invalid_status_value(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_status_invalid_status_value(client, temp_db_path, seed_minimal_data, admin_session):
     """Test updating to invalid status returns 400."""
     # Create an order
     conn = create_connection(temp_db_path)
@@ -82,7 +82,7 @@ def test_update_status_invalid_status_value(client, temp_db_path, seed_minimal_d
     assert "invalid status" in data["error"].lower()
 
 
-def test_update_status_invalid_transition(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_status_invalid_transition(client, temp_db_path, seed_minimal_data, admin_session):
     """Test invalid status transition returns 400."""
     # Create an order with status "Delivered"
     conn = create_connection(temp_db_path)
@@ -108,7 +108,7 @@ def test_update_status_invalid_transition(client, temp_db_path, seed_minimal_dat
     assert "invalid transition" in data["error"].lower()
 
 
-def test_update_status_missing_parameters(client, login_session):
+def test_update_status_missing_parameters(client, admin_session):
     """Test missing parameters returns 400."""
     # Missing new_status
     response = client.post('/admin/update_status',
@@ -129,7 +129,7 @@ def test_update_status_missing_parameters(client, login_session):
     assert data["ok"] is False
 
 
-def test_update_status_non_json_request(client, login_session):
+def test_update_status_non_json_request(client, admin_session):
     """Test non-JSON request returns 400."""
     response = client.post('/admin/update_status',
                           data="not json",
@@ -141,7 +141,7 @@ def test_update_status_non_json_request(client, login_session):
     assert "json" in data["error"].lower()
 
 
-def test_update_status_valid_transitions(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_status_valid_transitions(client, temp_db_path, seed_minimal_data, admin_session):
     """Test all valid status transitions work correctly."""
     transitions = [
         ("Ordered", "Preparing"),

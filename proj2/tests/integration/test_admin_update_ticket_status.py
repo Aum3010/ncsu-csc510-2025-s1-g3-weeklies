@@ -9,7 +9,7 @@ import pytest
 from sqlQueries import create_connection, close_connection, execute_query, fetch_one
 
 
-def test_update_ticket_status_success(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_ticket_status_success(client, temp_db_path, seed_minimal_data, admin_session):
     """Test successful ticket status update."""
     # Create a ticket with status "Open"
     conn = create_connection(temp_db_path)
@@ -54,7 +54,7 @@ def test_update_ticket_status_success(client, temp_db_path, seed_minimal_data, l
         close_connection(conn)
 
 
-def test_update_ticket_status_with_response(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_ticket_status_with_response(client, temp_db_path, seed_minimal_data, admin_session):
     """Test updating ticket status and adding a response to a non-Open ticket."""
     # Create a ticket with status "In Progress" (not Open)
     conn = create_connection(temp_db_path)
@@ -103,7 +103,7 @@ def test_update_ticket_status_with_response(client, temp_db_path, seed_minimal_d
         close_connection(conn)
 
 
-def test_update_ticket_auto_status_on_response(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_ticket_auto_status_on_response(client, temp_db_path, seed_minimal_data, admin_session):
     """Test automatic status update to 'In Progress' when response is added to 'Open' ticket."""
     # Create a ticket with status "Open"
     conn = create_connection(temp_db_path)
@@ -153,7 +153,7 @@ def test_update_ticket_auto_status_on_response(client, temp_db_path, seed_minima
         close_connection(conn)
 
 
-def test_update_ticket_status_invalid_ticket_id(client, login_session):
+def test_update_ticket_status_invalid_ticket_id(client, admin_session):
     """Test updating status for non-existent ticket returns 404."""
     response = client.post('/admin/update_ticket_status',
                           data=json.dumps({"ticket_id": 99999, "new_status": "Resolved"}),
@@ -165,7 +165,7 @@ def test_update_ticket_status_invalid_ticket_id(client, login_session):
     assert "not found" in data["error"].lower()
 
 
-def test_update_ticket_status_invalid_status_value(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_ticket_status_invalid_status_value(client, temp_db_path, seed_minimal_data, admin_session):
     """Test updating to invalid status returns 400."""
     # Create a ticket
     conn = create_connection(temp_db_path)
@@ -201,7 +201,7 @@ def test_update_ticket_status_invalid_status_value(client, temp_db_path, seed_mi
     assert "invalid status" in data["error"].lower()
 
 
-def test_update_ticket_status_missing_parameters(client, login_session):
+def test_update_ticket_status_missing_parameters(client, admin_session):
     """Test missing parameters returns 400."""
     # Missing new_status
     response = client.post('/admin/update_ticket_status',
@@ -222,7 +222,7 @@ def test_update_ticket_status_missing_parameters(client, login_session):
     assert data["ok"] is False
 
 
-def test_update_ticket_status_non_json_request(client, login_session):
+def test_update_ticket_status_non_json_request(client, admin_session):
     """Test non-JSON request returns 400."""
     response = client.post('/admin/update_ticket_status',
                           data="not json",
@@ -234,7 +234,7 @@ def test_update_ticket_status_non_json_request(client, login_session):
     assert "json" in data["error"].lower()
 
 
-def test_update_ticket_status_all_valid_statuses(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_ticket_status_all_valid_statuses(client, temp_db_path, seed_minimal_data, admin_session):
     """Test all valid ticket statuses can be set."""
     valid_statuses = ["Open", "In Progress", "Resolved", "Closed"]
     
@@ -280,7 +280,7 @@ def test_update_ticket_status_all_valid_statuses(client, temp_db_path, seed_mini
             close_connection(conn)
 
 
-def test_update_ticket_timestamp_updated(client, temp_db_path, seed_minimal_data, login_session):
+def test_update_ticket_timestamp_updated(client, temp_db_path, seed_minimal_data, admin_session):
     """Test that updated_at timestamp is updated when ticket is modified."""
     import time
     

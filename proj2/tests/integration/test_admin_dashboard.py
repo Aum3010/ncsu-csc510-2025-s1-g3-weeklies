@@ -9,13 +9,13 @@ from datetime import datetime, timedelta
 from sqlQueries import create_connection, close_connection, execute_query, fetch_one
 
 
-def test_admin_dashboard_renders(client, seed_minimal_data):
+def test_admin_dashboard_renders(client, seed_minimal_data, admin_session):
     """Test that the admin dashboard route renders successfully."""
     response = client.get("/admin")
     assert response.status_code == 200
 
 
-def test_admin_dashboard_with_orders(client, seed_minimal_data, temp_db_path):
+def test_admin_dashboard_with_orders(client, seed_minimal_data, admin_session, temp_db_path):
     """Test that admin dashboard displays orders grouped by status."""
     # Create some test orders
     conn = create_connection(temp_db_path)
@@ -72,7 +72,7 @@ def test_admin_dashboard_with_orders(client, seed_minimal_data, temp_db_path):
     assert b"$15.00" not in response.data
 
 
-def test_admin_dashboard_with_tickets(client, seed_minimal_data, temp_db_path):
+def test_admin_dashboard_with_tickets(client, seed_minimal_data, admin_session, temp_db_path):
     """Test that admin dashboard displays support tickets sorted by status."""
     # Create some test tickets
     conn = create_connection(temp_db_path)
@@ -142,14 +142,14 @@ def test_admin_dashboard_with_tickets(client, seed_minimal_data, temp_db_path):
     assert resolved_pos < closed_pos, "Resolved tickets should appear before Closed tickets"
 
 
-def test_admin_dashboard_empty_state(client, seed_minimal_data):
+def test_admin_dashboard_empty_state(client, seed_minimal_data, admin_session):
     """Test that admin dashboard handles empty state (no orders or tickets)."""
     response = client.get("/admin")
     assert response.status_code == 200
     # Should render without errors even with no data
 
 
-def test_admin_dashboard_tickets_sorted_by_created_at_within_status(client, seed_minimal_data, temp_db_path):
+def test_admin_dashboard_tickets_sorted_by_created_at_within_status(client, seed_minimal_data, admin_session, temp_db_path):
     """Test that tickets within the same status are sorted by created_at DESC (newest first)."""
     conn = create_connection(temp_db_path)
     try:
@@ -204,7 +204,7 @@ def test_admin_dashboard_tickets_sorted_by_created_at_within_status(client, seed
     assert middle_pos < oldest_pos, "Middle ticket should appear before oldest ticket"
 
 
-def test_admin_dashboard_ticket_pagination(client, seed_minimal_data, temp_db_path):
+def test_admin_dashboard_ticket_pagination(client, seed_minimal_data, admin_session, temp_db_path):
     """Test that admin dashboard paginates tickets correctly (20 per page)."""
     conn = create_connection(temp_db_path)
     try:
@@ -270,7 +270,7 @@ def test_admin_dashboard_ticket_pagination(client, seed_minimal_data, temp_db_pa
     assert response.status_code == 200
 
 
-def test_admin_dashboard_pagination_preserves_url(client, seed_minimal_data, temp_db_path):
+def test_admin_dashboard_pagination_preserves_url(client, seed_minimal_data, admin_session, temp_db_path):
     """Test that pagination controls preserve the page parameter in URLs."""
     conn = create_connection(temp_db_path)
     try:
@@ -314,7 +314,7 @@ def test_admin_dashboard_pagination_preserves_url(client, seed_minimal_data, tem
     assert 'Showing page 2 of' in html  # Current page indicator
 
 
-def test_admin_dashboard_no_pagination_with_few_tickets(client, seed_minimal_data, temp_db_path):
+def test_admin_dashboard_no_pagination_with_few_tickets(client, seed_minimal_data, admin_session, temp_db_path):
     """Test that pagination controls are not shown when there are 20 or fewer tickets."""
     # First, clear any existing tickets to ensure clean state
     conn = create_connection(temp_db_path)

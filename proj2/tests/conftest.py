@@ -28,7 +28,8 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS "User" (
   usr_id INTEGER PRIMARY KEY AUTOINCREMENT,
   first_name TEXT, last_name TEXT, email TEXT UNIQUE, phone TEXT,
-  password_HS TEXT, wallet INTEGER, preferences TEXT, allergies TEXT, generated_menu TEXT
+  password_HS TEXT, wallet INTEGER, preferences TEXT, allergies TEXT, generated_menu TEXT,
+  is_admin INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS "Restaurant" (
@@ -160,6 +161,31 @@ def seed_minimal_data(temp_db_path):
 def login_session(client, seed_minimal_data):
     """Log in the seeded user by simulating POST /login."""
     resp = client.post("/login", data={"email": "test@x.com", "password": "secret123"}, follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    return True
+
+@pytest.fixture()
+def admin_session(client, seed_minimal_data, temp_db_path):
+    """Log in as an admin user."""
+    conn = create_connection(temp_db_path)
+    try:
+        # Create admin user if doesn't exist
+        admin_email = "admin@test.com"
+        admin_row = fetch_one(conn, 'SELECT usr_id FROM "User" WHERE email=?', (admin_email,))
+        if admin_row is None:
+            execute_query(conn, '''
+              INSERT INTO "User"(first_name,last_name,email,phone,password_HS,wallet,is_admin)
+              VALUES ("Admin","User",?, "5550000", ?, 10000, 1)
+            ''', (admin_email, _hash_pw("admin123")))
+        else:
+            # Ensure user is admin
+            execute_query(conn, 'UPDATE "User" SET is_admin=1, password_HS=? WHERE email=?',
+                          (_hash_pw("admin123"), admin_email))
+    finally:
+        close_connection(conn)
+    
+    # Log in as admin
+    resp = client.post("/login", data={"email": admin_email, "password": "admin123"}, follow_redirects=False)
     assert resp.status_code in (302, 303)
     return True
 
