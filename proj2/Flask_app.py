@@ -983,6 +983,59 @@ def order():
             "meal": meal
         }
 
+        # Handle amount being debited from user's wallet
+        total_cents = _dollars_to_cents(total)
+        user_wallet_cents = session.get('Wallet', 0)
+
+        # Quick check based on session to prevent unnecessary transaction attempt
+        if user_wallet_cents < total_cents:
+            return jsonify({"ok": False, "error": "insufficient_funds"}), 402
+
+        # Insert the single order row with status "Ordered" AND debit the wallet atomically
+        conn = create_connection(db_file)
+        new_ord_id = None
+        try:
+            # 1. Prepare queries for atomic transaction: Debit wallet AND Insert order
+            queries_and_params = [
+                # Debit the wallet, using the WHERE clause as an optimistic check against race conditions
+                ('UPDATE "User" SET wallet = wallet - ? WHERE usr_id = ? AND wallet >= ?', (total_cents, usr_id, total_cents)),
+                # Insert the new order
+                ('INSERT INTO "Order" (rtr_id, usr_id, details, status) VALUES (?, ?, ?, ?)', (rtr_id, usr_id, json.dumps(details), OrderStatus.ORDERED.value))
+            ]
+
+            if _execute_transaction(conn, queries_and_params):
+                # Transaction succeeded. Wallet debited and order inserted.
+                # Get the order ID.
+                row = fetch_one(conn, 'SELECT ord_id FROM "Order" WHERE usr_id = ? ORDER BY ord_id DESC LIMIT 1', (usr_id,))
+                new_ord_id = row[0] if row else None
+
+                # Update session wallet to reflect the debit
+                session['Wallet'] = user_wallet_cents - total_cents
+                
+            else:
+                # Transaction failed. Most likely due to the `wallet >= ?` check failing (insufficient funds).
+                # Re-fetch wallet balance to confirm the insufficient funds error.
+                updated_wallet_row = fetch_one(conn, 'SELECT wallet FROM "User" WHERE usr_id = ?', (usr_id,))
+                updated_wallet = updated_wallet_row[0] if updated_wallet_row else 0
+                
+                if updated_wallet < total_cents:
+                    return jsonify({"ok": False, "error": "insufficient_funds"}), 402
+                
+                # Fallback for unexpected DB error during atomic transaction.
+                return jsonify({"ok": False, "error": "db_failed"}), 500
+
+        except Exception as e:
+            print(f"Order Placement Error: {e}")
+            return jsonify({"ok": False, "error": "server_error"}), 500
+
+        finally:
+            close_connection(conn)
+
+        if new_ord_id is None:
+             return jsonify({"ok": False, "error": "order_id_missing"}), 500
+        
+        return jsonify({"ok": True, "ord_id": new_ord_id})
+
         # Insert the single order row with status "Ordered"
         conn = create_connection(db_file)
         try:
