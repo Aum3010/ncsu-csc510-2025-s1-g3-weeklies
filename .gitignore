@@ -39,7 +39,6 @@ htmlcov/
 # Generated docs / reports
 site/
 docs/
-*.html
 *.pdf
 
 # Databases (important!)

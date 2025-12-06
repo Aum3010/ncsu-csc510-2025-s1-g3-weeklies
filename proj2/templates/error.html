@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ error }} · Weeklies</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg);
+        }
+
+        .error-container {
+            max-width: 600px;
+            margin: 100px auto;
+            padding: var(--space-6);
+            text-align: center;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .error-icon {
+            font-size: 72px;
+            margin-bottom: var(--space-4);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        .error-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: var(--space-2);
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: var(--muted);
+            margin-bottom: var(--space-5);
+            line-height: 1.6;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: var(--space-3);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius-xs);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-600);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(91, 140, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--hint);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--elev);
+            transform: translateY(-2px);
+        }
+
+        .btn-back {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+        }
+
+        .btn-back:hover {
+            color: var(--text);
+            border-color: var(--primary);
+        }
+
+        @media (max-width: 640px) {
+            .error-container {
+                margin: 40px 20px;
+                padding: var(--space-5);
+            }
+
+            .error-title {
+                font-size: 24px;
+            }
+
+            .error-actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="{{ url_for('index') }}">
+                <span class="logo"></span> Weeklies
+            </a>
+        </div>
+    </header>
+
+    <main class="main" style="flex: 1; display: flex; align-items: center;">
+        <div class="error-container">
+            <div class="error-icon">
+                {% if 'Access Denied' in error or 'Forbidden' in error %}
+                    🔒
+                {% elif 'Not Found' in error or '404' in error %}
+                    🔍
+                {% elif 'Unauthorized' in error %}
+                    🚫
+                {% else %}
+                    ⚠️
+                {% endif %}
+            </div>
+            <h1 class="error-title">{{ error }}</h1>
+            <p class="error-message">{{ message if message else 'Something went wrong. Please try again or contact support if the problem persists.' }}</p>
+            <div class="error-actions">
+                <button onclick="history.back()" class="btn btn-back">
+                    ← Go Back
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    🏠 Home
+                </a>
+                {% if session.get('Username') %}
+                <a href="{{ url_for('logout') }}" class="btn btn-secondary">
+                    Logout
+                </a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-secondary">
+                    Login
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">© 2025 Weeklies</div>
+    </footer>
+</body>
+</html>
