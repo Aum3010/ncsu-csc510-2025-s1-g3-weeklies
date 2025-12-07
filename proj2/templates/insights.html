@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Insights · Weeklies</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="{{ url_for('index') }}"><span class="logo"></span> Weeklies</a>
+    <nav>
+      <a href="{{ url_for('index') }}">Home</a>
+      <a href="{{ url_for('profile') }}">Profile</a>
+      <a href="{{ url_for('restaurants') }}">Restaurants</a>
+      <a href="{{ url_for('orders') }}">Order</a>
+      <a href="{{ url_for('insights') }}" aria-current="page">Insights</a>
+      <a href="{{ url_for('logout') }}" data-confirm="Log out now?">Logout</a>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  <div class="container">
+    <div class="page-title">
+      <h1>Data Intelligence</h1>
+      <p class="muted">Deep dive into your eating habits and spending.</p>
+    </div>
+
+    <div class="grid-3 mb-6">
+      <div class="card p-4">
+        <div class="stat-label">Total Spend</div>
+        <div class="stat-val" id="val-spend">...</div>
+      </div>
+      <div class="card p-4">
+        <div class="stat-label">Total Orders</div>
+        <div class="stat-val" id="val-orders">...</div>
+      </div>
+      <div class="card p-4">
+        <div class="stat-label">Avg Order Value</div>
+        <div class="stat-val" id="val-avg">...</div>
+      </div>
+    </div>
+
+    <div class="card mb-6" style="border-left: 4px solid var(--primary);">
+      <div class="card-body">
+        <h3 class="h5">💡 AI Analyst Findings</h3>
+        <ul id="ai-findings" class="insights-list">
+          <li>Analyzing your data...</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">Ordering Habits (Day of Week)</div>
+        <div class="card-body">
+          <canvas id="chartDay"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Meal Time Breakdown</div>
+        <div class="card-body">
+          <canvas id="chartTime"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Where does the money go?</div>
+        <div class="card-body">
+          <canvas id="chartSpend"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Most Frequent Spots</div>
+        <div class="card-body">
+          <canvas id="chartRest"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Delivery vs Pickup</div>
+        <div class="card-body">
+          <canvas id="chartMode"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Favorite Items</div>
+        <div class="card-body">
+          <canvas id="chartItems"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<style>
+  .stat-label { font-size: 0.9rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-val { font-size: 2rem; font-weight: 800; color: var(--text); }
+  .p-4 { padding: 24px; }
+  .insights-list li { margin-bottom: 8px; font-size: 1.05rem; }
+  /* Ensure canvases have height */
+  canvas { max-height: 250px; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch("{{ url_for('insights_data') }}");
+    const json = await res.json();
+
+    if (json.error) return;
+
+    // 1. Fill Stats
+    document.getElementById('val-spend').textContent = '$' + json.stats.total_spend.toFixed(2);
+    document.getElementById('val-orders').textContent = json.stats.total_orders;
+    document.getElementById('val-avg').textContent = '$' + json.stats.avg_order.toFixed(2);
+
+    // 2. Fill Insights
+    const list = document.getElementById('ai-findings');
+    list.innerHTML = '';
+    if (json.insights.length === 0) {
+      list.innerHTML = '<li>No enough data for insights yet. Place more orders!</li>';
+    } else {
+      json.insights.forEach(txt => {
+        const li = document.createElement('li');
+        li.textContent = txt;
+        list.appendChild(li);
+      });
+    }
+
+    // 3. Render Charts (Helpers)
+    const colors = ['#5b8cff', '#29c48a', '#ffcc66', '#ff6b6b', '#a9afc1'];
+    
+    function createChart(id, type, labels, data, label, colorIdx=0) {
+      new Chart(document.getElementById(id), {
+        type: type,
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: data,
+            backgroundColor: type==='bar' || type==='doughnut' ? colors : colors[colorIdx],
+            borderColor: colors[colorIdx],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: type !== 'bar' } }
+        }
+      });
+    }
+
+    createChart('chartDay', 'bar', json.charts.activity_by_day.labels, json.charts.activity_by_day.data, 'Orders', 0);
+    createChart('chartTime', 'doughnut', json.charts.meal_times.labels, json.charts.meal_times.data, 'Orders');
+    createChart('chartSpend', 'pie', json.charts.spending_breakdown.labels, json.charts.spending_breakdown.data, 'Cost ($)');
+    
+    // Horizontal bar for restaurants
+    new Chart(document.getElementById('chartRest'), {
+      type: 'bar',
+      data: {
+        labels: json.charts.top_restaurants.labels,
+        datasets: [{ label: 'Orders', data: json.charts.top_restaurants.data, backgroundColor: '#5b8cff' }]
+      },
+      options: { indexAxis: 'y' }
+    });
+
+    createChart('chartMode', 'doughnut', json.charts.delivery_mode.labels, json.charts.delivery_mode.data, 'Count');
+    
+    new Chart(document.getElementById('chartItems'), {
+      type: 'bar',
+      data: {
+        labels: json.charts.top_items.labels,
+        datasets: [{ label: 'Qty Ordered', data: json.charts.top_items.data, backgroundColor: '#29c48a' }]
+      },
+      options: { indexAxis: 'y' }
+    });
+
+  } catch (e) {
+    console.error("Insights load error", e);
+  }
+});
+</script>
+
+<footer class="footer">
+  <div class="container">© 2025 Weeklies</div>
+</footer>
+</body>
+</html>
