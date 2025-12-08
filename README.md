@@ -44,16 +44,24 @@ The project demonstrates **modular backend design**, **frontend interaction**, *
 
 ---
 
-## 🧩 Core Features
+## 🧩 Existing Features
 
 - 👤 **User registration & authentication**
 - 🍱 **Menu and restaurant search** with allergen + cuisine tagging
 - 🧭 **User preference tagging** and filtering
 - 📅 **Calendar-based scheduling** (order-on-selected-date logic)
 - 🧾 **Dynamic PDF receipt generation**
-- 🤖 **LLM integration** for context-aware meal suggestions
 - 🧪 **Automated test suite** with `pytest`
 - 🧰 **CI/CD workflows** for tests, linting, and documentation deployment
+
+## 🧩 Our Enhancements
+- 🤖 **LLM integration** for context-aware meal suggestions and planning weekly meals
+- ⚙️ **Admin Dashboard** for managing orders
+- ✉️ **Support Ticket System** for customer support
+- 📈 **User Insights** to understand user behaviour
+- ⭐ **Restaurant Reviews** to share user reviews
+- 📊 **Restaurant Rating** to quickly identify good restaurants
+- 💰 **Functional Wallet and Currency System** to experience proper ordering flow
 
 ---
 
