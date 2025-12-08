@@ -27,7 +27,7 @@ The project demonstrates **modular backend design**, **frontend interaction**, *
 ---
 
 ## 🎬 Live Demo
-👉 ![[Click here to watch the demo video on YouTube](https://img.youtube.com/vi/yNC3aD4ZACk/0.jpg)](https://youtu.be/yNC3aD4ZACk)
+![[Watch the demo video on YouTube](https://img.youtube.com/vi/yNC3aD4ZACk/0.jpg)](https://youtu.be/yNC3aD4ZACk)
 
 ---
 
