@@ -1,20 +1,21 @@
 # 🍽️ WEEKLIES — Intelligent Meal Planning and Delivery System
 
-[![CI](https://github.com/TaylorBrown96/SE25Fall/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TaylorBrown96/SE25Fall/actions/workflows/ci.yml)
-[![Docs](https://github.com/TaylorBrown96/SE25Fall/actions/workflows/docs.yml/badge.svg?branch=main&event=push)](https://github.com/TaylorBrown96/SE25Fall/actions/workflows/docs.yml)
+[![CI](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/ci.yml)
+[![Docs](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/docs.yml/badge.svg?branch=main&event=push)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/docs.yml)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)]()
-![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/TaylorBrown96/0c223cf33bf0cc9b91667676c415aafa/raw/tests-badge.json)
-[![codecov](https://codecov.io/gh/TaylorBrown96/SE25Fall/branch/main/graph/badge.svg)](https://codecov.io/gh/TaylorBrown96/SE25Fall)
+![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Aum3010/0c223cf33bf0cc9b91667676c415aafa/raw/tests-badge.json)
+![Code Coverage](https://img.shields.io/badge/coverage-91%25-green
+)
 [![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/github/license/TaylorBrown96/SE25Fall.svg)](LICENSE)
-[![GitHub last commit](https://img.shields.io/github/last-commit/TaylorBrown96/SE25Fall.svg)](https://github.com/TaylorBrown96/SE25Fall/commits)
-[![GitHub issues](https://img.shields.io/github/issues/TaylorBrown96/SE25Fall.svg)](https://github.com/TaylorBrown96/SE25Fall/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/TaylorBrown96/SE25Fall.svg)](https://github.com/TaylorBrown96/SE25Fall/pulls)
-[![Repo Size](https://img.shields.io/github/repo-size/TaylorBrown96/SE25Fall.svg)](https://github.com/TaylorBrown96/SE25Fall)
-[![Contributors](https://img.shields.io/github/contributors/TaylorBrown96/SE25Fall.svg)](https://github.com/TaylorBrown96/SE25Fall/graphs/contributors)
+[![License](https://img.shields.io/github/license/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](LICENSE)
+[![GitHub last commit](https://img.shields.io/github/last-commit/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/commits)
+[![GitHub issues](https://img.shields.io/github/issues/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/pulls)
+[![Repo Size](https://img.shields.io/github/repo-size/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies)
+[![Contributors](https://img.shields.io/github/contributors/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/graphs/contributors)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Lint: ruff](https://img.shields.io/badge/lint-ruff-46a2f1?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
-[![DOI](https://zenodo.org/badge/1042386944.svg)](https://doi.org/10.5281/zenodo.17547176)
+[![DOI](https://zenodo.org/badge/1108504869.svg)](https://doi.org/10.5281/zenodo.17850780)
 ---
 
 ## 🧠 Project Overview
@@ -26,7 +27,7 @@ The project demonstrates **modular backend design**, **frontend interaction**, *
 ---
 
 ## 🎬 Live Demo
-👉 [Click here to watch the demo video on YouTube](https://youtu.be/CKCTOMVMst8)
+👉 ![[Click here to watch the demo video on YouTube](https://img.youtube.com/vi/yNC3aD4ZACk/0.jpg)](https://youtu.be/yNC3aD4ZACk)
 
 ---
 
@@ -116,13 +117,13 @@ Setup, environment creation, and execution instructions have been moved to a ded
 
 ##  👥 Team & Contributors
 Project developed collaboratively as part of **CSC 510 — Software Engineering (Fall 2025, NC State University)**.
+This project was extended using the prior work done by Section 001 Group 9: Taylor J. Brown, Kunal Jindal, Ashritha Bugada, Daniel Dong.
 
 | Member | GitHub Handle | Key Contributions |
 |---------|----------------|-------------------|
-| **Taylor J. Brown** | [@TaylorBrown96](https://github.com/TaylorBrown96) | Led user authentication and preference management. Implemented menu tagging (allergens, cuisine types) and PDF receipt generation. Integrated JS calendar template for scheduling. Contributed to backend expansion and system testing. |
-| **Kunal Jindal** | [@devkunal2002](https://github.com/devkunal2002) | Designed and automated documentation pipeline using `pdoc`. Authored Installation Guide and main README. Set up CI/CD workflows, repository structure, and code quality badging. Contributed to backend testing and verification. |
-| **Ashritha Bugada** | — | Developed restaurant search, menu browsing, and ordering flow. Designed dynamic menu templates and integrated frontend-backend routes for order placement. Assisted with usability testing and validation. |
-| **Daniel Dong** | — | Implemented backend for calendar scheduling and integrated LLM module for personalized recommendations. Supported expansion of core Flask app and contributed to end-to-end feature debugging. |
+| **Aum Pandya** | [@Aum3010](https://github.com/Aum3010) | Added LLM based weekly plan generation. Implemented user-specific Insights dashboard to provide detailed feedback. |
+| **Pranav Bhagwat** | [@alt-Pranav](https://github.com/alt-Pranav) | Added a functional currency system using the wallet for managing orders, topping up balance and gifting to other users. Implemented restaurant specific ratings and review system shared across all users. |
+| **Tayo Olukotun** | [@tysjosh](https://github.com/tysjosh) | Developed an admin dashboard to manage orders and manage state. Implemented a support ticket system to help users get customer support by raising tickets. |
 
 ---
 
