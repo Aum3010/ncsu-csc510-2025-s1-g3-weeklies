@@ -1,11 +1,11 @@
 # 🍽️ WEEKLIES — Intelligent Meal Planning and Delivery System
-
 [![Tests](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/ci.yml)
 [![Docs](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/docs.yml/badge.svg?branch=main&event=push)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/docs.yml)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)]()
 ![Code Coverage](https://img.shields.io/badge/coverage-91%25-green)
 ![Total No of tests](https://img.shields.io/badge/total%20no%20of%20tests-243-green)
-[![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask&logoColor=white)](https://flask.palletsprojects.com/
+)
 [![License](https://img.shields.io/github/license/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](LICENSE)
 [![GitHub last commit](https://img.shields.io/github/last-commit/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/commits)
 [![GitHub issues](https://img.shields.io/github/issues/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/issues)
@@ -14,7 +14,8 @@
 [![Contributors](https://img.shields.io/github/contributors/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/graphs/contributors)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Lint: ruff](https://img.shields.io/badge/lint-ruff-46a2f1?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
-[![DOI](https://zenodo.org/badge/1108504869.svg)](https://doi.org/10.5281/zenodo.17850780)
+[![Zenodo](https://zenodo.org/badge/DOI/10.5281/zenodo.17850781.svg)](https://doi.org/10.5281/zenodo.17850780)
+
 ---
 
 ## 🧠 Project Overview
