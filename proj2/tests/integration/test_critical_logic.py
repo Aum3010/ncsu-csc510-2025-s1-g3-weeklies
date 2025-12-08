@@ -33,6 +33,13 @@ def test_order_post_fails_on_insufficient_funds(client, seed_minimal_data, login
     usr_id = seed_minimal_data["usr_id"]
     rtr_id = seed_minimal_data["rtr_id"]
     
+    # --- CLEANUP: Remove any prior orders for this user so we start fresh ---
+    conn = create_connection(temp_db_path)
+    try:
+        execute_query(conn, 'DELETE FROM "Order" WHERE usr_id = ?', (usr_id,))
+    finally:
+        close_connection(conn)
+    
     # Get the ID of a MenuItem
     conn = create_connection(temp_db_path)
     try:
@@ -161,8 +168,6 @@ def test_review_submit_fails_on_duplicate_review(client, seed_minimal_data, logi
 def test_review_submit_success_stores_review(client, seed_minimal_data, login_session, temp_db_path):
     """
     Test 4/9: Verifies successful review submission and checks DB state.
-    
-    FIX: Added a DELETE query to ensure a clean state before submitting the review.
     """
     usr_id = seed_minimal_data["usr_id"]
     rtr_id = seed_minimal_data["rtr_id"]
@@ -170,7 +175,7 @@ def test_review_submit_success_stores_review(client, seed_minimal_data, login_se
     # 1. Clean up potential previous reviews and create a dummy 'delivered' order
     conn = create_connection(temp_db_path)
     try:
-        # FIX: Ensure a clean state by deleting any existing review for this user/restaurant pair
+        # Ensure a clean state by deleting any existing review for this user/restaurant pair
         execute_query(conn, 'DELETE FROM "Review" WHERE usr_id = ? AND rtr_id = ?', (usr_id, rtr_id))
 
         execute_query(conn, 'INSERT INTO "Order" (rtr_id, usr_id, details, status) VALUES (?, ?, "{}", "Ordered")', (rtr_id, usr_id))
@@ -291,8 +296,6 @@ def test_wallet_gift_fails_on_insufficient_funds_atomicity(client, seed_minimal_
     """
     Test 7/9: Verifies that a wallet gift transaction fails atomically if the sender
     has insufficient funds, and checks the correct redirect is issued.
-    
-    FIX: Changed follow_redirects=True to False and asserted against Location header.
     """
     sender_id = seed_minimal_data["usr_id"]
     recipient_email = seed_second_user["usr_email"]
@@ -312,10 +315,10 @@ def test_wallet_gift_fails_on_insufficient_funds_atomicity(client, seed_minimal_
     response = client.post("/profile/wallet/gift", data={
         "recipient_email": recipient_email,
         "amount": gift_amount
-    }, follow_redirects=False) # <<< FIX: Do not follow redirect
+    }, follow_redirects=False)
 
     # 3. Assert failure and redirect URL
-    assert response.status_code == 302 # <<< FIX: Check for redirect status
+    assert response.status_code == 302 
     redirect_url = response.headers['Location']
     assert '/profile?wallet_error=insufficient_funds' in redirect_url, "Should redirect to profile with insufficient_funds error"
 
@@ -386,8 +389,6 @@ def test_support_submit_fails_on_short_message(client, seed_minimal_data, login_
     """
     Test 9/9: Verifies that submitting a support ticket with a message shorter than 10 
     characters fails and redirects with a specific error flag.
-    
-    FIX: Changed the test message length from 11 to 9 characters.
     """
     usr_id = seed_minimal_data["usr_id"]
     rtr_id = seed_minimal_data["rtr_id"]
