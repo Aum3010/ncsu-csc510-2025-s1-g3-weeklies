@@ -3,8 +3,8 @@
 [![Tests](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/ci.yml)
 [![Docs](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/docs.yml/badge.svg?branch=main&event=push)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/actions/workflows/docs.yml)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)]()
-![Code Coverage](https://img.shields.io/badge/coverage-91%25-green
-)
+![Code Coverage](https://img.shields.io/badge/coverage-91%25-green)
+![Total No of tests](https://img.shields.io/badge/total%20no%20of%20tests-243-green)
 [![Flask](https://img.shields.io/badge/Flask-2.x-lightgrey?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![License](https://img.shields.io/github/license/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](LICENSE)
 [![GitHub last commit](https://img.shields.io/github/last-commit/Aum3010/ncsu-csc510-2025-s1-g3-weeklies.svg)](https://github.com/Aum3010/ncsu-csc510-2025-s1-g3-weeklies/commits)
