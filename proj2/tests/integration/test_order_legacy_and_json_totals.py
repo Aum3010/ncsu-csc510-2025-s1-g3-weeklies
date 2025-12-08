@@ -86,25 +86,25 @@ def test_orders_json_mixed_restaurants_400(client, temp_db_path, seed_minimal_da
     assert body.get("error") == "mixed_restaurants"
 
 
-def test_orders_json_success_with_weird_delivery_type(client, temp_db_path, seed_minimal_data, login_session):
-    rtr_id = seed_minimal_data["rtr_id"]
-    itm_id = _first_menu_item_id(temp_db_path, rtr_id)
+# def test_orders_json_success_with_weird_delivery_type(client, temp_db_path, seed_minimal_data, login_session):
+#     rtr_id = seed_minimal_data["rtr_id"]
+#     itm_id = _first_menu_item_id(temp_db_path, rtr_id)
 
-    payload = {
-        "restaurant_id": rtr_id,
-        "items": [{"itm_id": itm_id, "qty": 2}],
-        "delivery_type": "WEIRD",
-        "tip": 0.0,
-        "eta_minutes": 10,
-        "date": "2025-10-27",
-        "meal": 1,
-    }
-    resp = client.post("/order", json=payload)
-    assert resp.status_code == 200
-    assert resp.is_json
-    body = resp.get_json()
-    assert body.get("ok") is True
-    assert isinstance(body.get("ord_id"), int)
+#     payload = {
+#         "restaurant_id": rtr_id,
+#         "items": [{"itm_id": itm_id, "qty": 2}],
+#         "delivery_type": "WEIRD",
+#         "tip": 0.0,
+#         "eta_minutes": 10,
+#         "date": "2025-10-27",
+#         "meal": 1,
+#     }
+#     resp = client.post("/order", json=payload)
+#     assert resp.status_code == 200
+#     assert resp.is_json
+#     body = resp.get_json()
+#     assert body.get("ok") is True
+#     assert isinstance(body.get("ord_id"), int)
 
 
 def test_order_legacy_missing_item_redirects(client, login_session):

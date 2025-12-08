@@ -9,7 +9,7 @@ import types
 import pytest
 import sqlite3
 
-from playwright.sync_api import sync_playwright
+# from playwright.sync_api import sync_playwright
 
 # Import your app module
 import Flask_app as Flask_app

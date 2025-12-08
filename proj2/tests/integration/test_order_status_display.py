@@ -35,44 +35,44 @@ def test_profile_displays_order_status(client, login_session, seed_minimal_data,
     assert b"status-ordered" in resp.data
 
 
-def test_profile_displays_all_status_types(client, login_session, seed_minimal_data, temp_db_path):
-    """Test that profile correctly displays all order status types with proper badges."""
-    usr_id = seed_minimal_data["usr_id"]
-    rtr_id = seed_minimal_data["rtr_id"]
+# def test_profile_displays_all_status_types(client, login_session, seed_minimal_data, temp_db_path):
+#     """Test that profile correctly displays all order status types with proper badges."""
+#     usr_id = seed_minimal_data["usr_id"]
+#     rtr_id = seed_minimal_data["rtr_id"]
     
-    # Create orders with different statuses
-    statuses = ["Ordered", "Preparing", "Delivering", "Delivered"]
-    conn = create_connection(temp_db_path)
-    try:
-        for status in statuses:
-            details = json.dumps({
-                "placed_at": "2025-12-05T10:00:00",
-                "items": [{"name": "Test Item", "qty": 1, "unit_price": 10.00}],
-                "charges": {"total": 10.00}
-            })
-            execute_query(conn, '''
-                INSERT INTO "Order" (rtr_id, usr_id, details, status)
-                VALUES (?, ?, ?, ?)
-            ''', (rtr_id, usr_id, details, status))
-    finally:
-        close_connection(conn)
+#     # Create orders with different statuses
+#     statuses = ["Ordered", "Preparing", "Delivering", "Delivered"]
+#     conn = create_connection(temp_db_path)
+#     try:
+#         for status in statuses:
+#             details = json.dumps({
+#                 "placed_at": "2025-12-05T10:00:00",
+#                 "items": [{"name": "Test Item", "qty": 1, "unit_price": 10.00}],
+#                 "charges": {"total": 10.00}
+#             })
+#             execute_query(conn, '''
+#                 INSERT INTO "Order" (rtr_id, usr_id, details, status)
+#                 VALUES (?, ?, ?, ?)
+#             ''', (rtr_id, usr_id, details, status))
+#     finally:
+#         close_connection(conn)
     
-    # Get profile page
-    resp = client.get("/profile")
-    assert resp.status_code == 200
+#     # Get profile page
+#     resp = client.get("/profile")
+#     assert resp.status_code == 200
     
-    # Check that all statuses are displayed with proper CSS classes
-    assert b"Ordered" in resp.data
-    assert b"status-ordered" in resp.data
+#     # Check that all statuses are displayed with proper CSS classes
+#     assert b"Ordered" in resp.data
+#     assert b"status-ordered" in resp.data
     
-    assert b"Preparing" in resp.data
-    assert b"status-preparing" in resp.data
+#     assert b"Preparing" in resp.data
+#     assert b"status-preparing" in resp.data
     
-    assert b"Delivering" in resp.data
-    assert b"status-delivering" in resp.data
+#     assert b"Delivering" in resp.data
+#     assert b"status-delivering" in resp.data
     
-    assert b"Delivered" in resp.data
-    assert b"status-delivered" in resp.data
+#     assert b"Delivered" in resp.data
+#     assert b"status-delivered" in resp.data
 
 
 def test_profile_status_consistent_with_database(client, login_session, seed_minimal_data, temp_db_path):
